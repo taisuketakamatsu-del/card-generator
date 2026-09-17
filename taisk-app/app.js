@@ -813,6 +813,19 @@
   // entirely rather than picking another tab.
   privateToggleBtn.addEventListener("click", () => setTab(currentTab === "private" ? lastWorkTab : "private"));
 
+  // Two extra, always-available ways back from private, in case the small
+  // toggle button is ever missed: the logo, and the Escape key.
+  const logoEl = document.querySelector(".logo");
+  if (logoEl) {
+    logoEl.style.cursor = "pointer";
+    logoEl.addEventListener("click", () => { if (currentTab === "private") setTab(lastWorkTab); });
+  }
+  document.addEventListener("keydown", (e) => {
+    if (e.key !== "Escape" || currentTab !== "private") return;
+    if (modalOverlay.classList.contains("open") || shareOverlay.classList.contains("open") || nicknameOverlay.classList.contains("open")) return;
+    setTab(lastWorkTab);
+  });
+
   function setTab(tab) {
     // プライベート is deliberately separate from the 仕事/完了済み pair —
     // leaving it always re-locks it, so the passcode is asked again every
