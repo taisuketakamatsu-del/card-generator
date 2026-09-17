@@ -27,19 +27,43 @@ html, body {
   overflow: hidden;
   background: var(--bg);
   background-image:
-    radial-gradient(ellipse 900px 500px at 15% -10%, rgba(124, 92, 252, 0.10), transparent 60%),
-    radial-gradient(ellipse 700px 500px at 100% 0%, rgba(59, 108, 246, 0.08), transparent 60%);
+    radial-gradient(1300px 850px at 90% -14%, rgba(139, 92, 246, 0.38), transparent 55%),
+    radial-gradient(750px 950px at 104% 8%, rgba(99, 102, 241, 0.22), transparent 60%),
+    linear-gradient(128deg, rgba(196, 181, 253, 0.10) 0%, transparent 30%),
+    radial-gradient(900px 600px at -5% 105%, rgba(139, 92, 246, 0.07), transparent 60%);
+  background-attachment: fixed;
   color: var(--text-primary);
   font-family: "Inter", "Noto Sans JP", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   transition: background-image 0.4s ease;
+}
+
+/* Subtle film-grain over the glow so the background reads as textured
+   light rather than a flat gradient. Pure CSS/SVG, no image asset. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.05;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 140px 140px;
+}
+
+.app {
+  position: relative;
+  z-index: 1;
 }
 
 /* プライベート mode gets its own distinct cyan/blue ambient tint, so it
    reads as a genuinely separate space, not just a re-colored accent. */
 body.tab-private {
   background-image:
-    radial-gradient(ellipse 900px 500px at 15% -10%, rgba(56, 189, 248, 0.14), transparent 60%),
-    radial-gradient(ellipse 700px 500px at 100% 0%, rgba(37, 99, 235, 0.16), transparent 60%);
+    radial-gradient(1300px 850px at 90% -14%, rgba(56, 189, 248, 0.42), transparent 55%),
+    radial-gradient(750px 950px at 104% 8%, rgba(37, 99, 235, 0.24), transparent 60%),
+    linear-gradient(128deg, rgba(125, 211, 252, 0.10) 0%, transparent 30%),
+    radial-gradient(900px 600px at -5% 105%, rgba(37, 99, 235, 0.07), transparent 60%);
 }
 
 .app-footer {
@@ -214,6 +238,9 @@ body.tab-private .tab-bar { display: none; }
   background: var(--panel);
   border: 1px solid var(--panel-border);
   border-radius: 24px;
+  backdrop-filter: blur(22px);
+  -webkit-backdrop-filter: blur(22px);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 20px 50px rgba(0, 0, 0, 0.35);
 }
 .private-locked .lock-icon {
   width: 56px;
@@ -370,6 +397,9 @@ body.tab-private .btn-add {
   border-radius: var(--radius-lg);
   padding: calc(14px * var(--rank-scale, 1)) calc(20px * var(--rank-scale, 1));
   flex: none;
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0, 0, 0.25);
   transition: background 0.15s ease, padding 0.15s ease;
   cursor: pointer;
 }
@@ -466,6 +496,9 @@ body.tab-private .btn-add {
   min-height: 0;
   display: flex;
   flex-direction: column;
+  backdrop-filter: blur(22px);
+  -webkit-backdrop-filter: blur(22px);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 20px 50px rgba(0, 0, 0, 0.3);
   transition: background 0.15s ease, border-color 0.15s ease;
 }
 
@@ -542,6 +575,9 @@ body.tab-private .btn-add {
   border-radius: var(--radius-md);
   padding: 12px 14px;
   flex: none;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
   cursor: grab;
   transition: background 0.15s ease, border-color 0.15s ease;
 }
@@ -675,12 +711,13 @@ body.tab-private .btn-add {
 .modal {
   width: 100%;
   max-width: 420px;
-  background: #12142280;
-  background: #12142a;
+  background: rgba(18, 20, 42, 0.72);
   border: 1px solid var(--panel-border);
   border-radius: 22px;
   padding: 26px;
-  box-shadow: 0 30px 80px rgba(0,0,0,0.5);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 30px 80px rgba(0, 0, 0, 0.5);
 }
 
 .modal h3 {
