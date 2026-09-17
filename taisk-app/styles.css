@@ -1,9 +1,11 @@
 :root {
   --bg: #080a13;
-  --panel: rgba(255, 255, 255, 0.035);
-  --panel-border: rgba(255, 255, 255, 0.06);
-  --row-bg: rgba(255, 255, 255, 0.04);
-  --row-bg-hover: rgba(255, 255, 255, 0.065);
+  --panel: rgba(255, 255, 255, 0.07);
+  --panel-border: rgba(255, 255, 255, 0.16);
+  --row-bg: rgba(255, 255, 255, 0.075);
+  --row-bg-hover: rgba(255, 255, 255, 0.11);
+  --glass-blur: blur(40px) saturate(160%);
+  --glass-sheen: linear-gradient(135deg, rgba(255,255,255,0.14) 0%, rgba(255,255,255,0.03) 35%, transparent 60%);
   --text-primary: #f2f3f7;
   --text-secondary: #9096a8;
   --text-muted: #5c6178;
@@ -179,9 +181,10 @@ body.tab-private {
 .tab-btn.active[data-tab="completed"] { background: rgba(148, 163, 184, 0.28); }
 .tab-btn:not(.active):hover { color: var(--text-primary); }
 
-/* The work tab-bar disappears entirely while in プライベート, so switching
-   feels like leaving to a different place rather than picking a tab. */
-body.tab-private .tab-bar { display: none; }
+/* 仕事/完了済み stay visible and reachable even while in プライベート —
+   only the content area and background switch, never the navigation. */
+body.tab-private .tab-bar { opacity: 0.5; }
+body.tab-private .tab-bar:hover { opacity: 1; }
 
 /* One small, quiet button that swaps role: "プライベート" from work,
    "仕事に戻る" once inside — never a third equal-weight tab. */
@@ -288,13 +291,27 @@ body.tab-private .tab-bar { display: none; }
   max-width: 360px;
   margin: 40px auto;
   padding: 40px 32px;
+  position: relative;
   background: var(--panel);
   border: 1px solid var(--panel-border);
   border-radius: 24px;
-  backdrop-filter: blur(22px);
-  -webkit-backdrop-filter: blur(22px);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 20px 50px rgba(0, 0, 0, 0.35);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    inset 0 0 60px rgba(59, 130, 246, 0.10),
+    0 0 0 1px rgba(59, 130, 246, 0.12),
+    0 30px 70px rgba(0, 0, 0, 0.45);
+  overflow: hidden;
 }
+.private-locked::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--glass-sheen);
+  pointer-events: none;
+}
+.private-locked > * { position: relative; }
 .private-locked .lock-icon {
   width: 56px;
   height: 56px;
@@ -450,9 +467,13 @@ body.tab-private .btn-add {
   border-radius: var(--radius-lg);
   padding: calc(14px * var(--rank-scale, 1)) calc(20px * var(--rank-scale, 1));
   flex: none;
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 10px 30px rgba(0, 0, 0, 0.25);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    inset 0 0 30px rgba(139, 92, 246, 0.08),
+    0 0 0 1px rgba(255, 255, 255, 0.04),
+    0 14px 34px rgba(0, 0, 0, 0.3);
   transition: background 0.15s ease, padding 0.15s ease;
   cursor: pointer;
 }
@@ -483,7 +504,9 @@ body.tab-private .btn-add {
   position: absolute;
   inset: 0;
   border-radius: var(--radius-lg);
-  background: linear-gradient(90deg, rgba(124, 92, 252, 0.10), transparent 55%);
+  background:
+    var(--glass-sheen),
+    linear-gradient(90deg, rgba(124, 92, 252, 0.10), transparent 55%);
   opacity: var(--rank-opacity, 1);
   pointer-events: none;
   transition: opacity 0.15s ease;
@@ -542,6 +565,7 @@ body.tab-private .btn-add {
 }
 
 .column {
+  position: relative;
   background: var(--panel);
   border: 1px solid var(--panel-border);
   border-radius: 24px;
@@ -549,11 +573,24 @@ body.tab-private .btn-add {
   min-height: 0;
   display: flex;
   flex-direction: column;
-  backdrop-filter: blur(22px);
-  -webkit-backdrop-filter: blur(22px);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 20px 50px rgba(0, 0, 0, 0.3);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    inset 0 0 40px rgba(124, 92, 252, 0.06),
+    0 0 0 1px rgba(255, 255, 255, 0.04),
+    0 24px 60px rgba(0, 0, 0, 0.4);
+  overflow: hidden;
   transition: background 0.15s ease, border-color 0.15s ease;
 }
+.column::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--glass-sheen);
+  pointer-events: none;
+}
+.column > * { position: relative; }
 
 .column.drag-over {
   background: rgba(255, 255, 255, 0.06);
@@ -628,9 +665,9 @@ body.tab-private .btn-add {
   border-radius: var(--radius-md);
   padding: 12px 14px;
   flex: none;
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18), inset 0 0 20px rgba(139, 92, 246, 0.05);
   cursor: grab;
   transition: background 0.15s ease, border-color 0.15s ease;
 }
@@ -762,16 +799,29 @@ body.tab-private .btn-add {
 .modal-overlay.open { display: flex; }
 
 .modal {
+  position: relative;
   width: 100%;
   max-width: 420px;
-  background: rgba(18, 20, 42, 0.72);
+  background: rgba(18, 20, 42, 0.6);
   border: 1px solid var(--panel-border);
   border-radius: 22px;
   padding: 26px;
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07), 0 30px 80px rgba(0, 0, 0, 0.5);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    inset 0 0 60px rgba(124, 92, 252, 0.08),
+    0 30px 80px rgba(0, 0, 0, 0.55);
+  overflow: hidden;
 }
+.modal::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--glass-sheen);
+  pointer-events: none;
+}
+.modal > * { position: relative; }
 
 .modal h3 {
   margin: 0 0 18px;
