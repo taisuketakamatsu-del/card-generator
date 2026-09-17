@@ -34,8 +34,13 @@
       <nav class="tab-bar" id="tabBar">
         <button type="button" class="tab-btn active" data-tab="shared">仕事</button>
         <button type="button" class="tab-btn" data-tab="completed">完了済み</button>
-        <button type="button" class="tab-btn" data-tab="private">プライベート</button>
       </nav>
+
+      <button type="button" class="private-toggle-btn" id="privateToggleBtn" title="プライベート">
+        <svg class="icon-lock" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="9" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+        <svg class="icon-back" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none;"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+        <span id="privateToggleLabel">プライベート</span>
+      </button>
 
       <button class="btn-share" id="shareBtn" title="タスクを共有">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>

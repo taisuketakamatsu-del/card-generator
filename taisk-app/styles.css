@@ -153,8 +153,34 @@ body.tab-private {
 .tab-btn.active { color: #fff; }
 .tab-btn.active[data-tab="shared"] { background: rgba(124, 92, 252, 0.28); }
 .tab-btn.active[data-tab="completed"] { background: rgba(148, 163, 184, 0.28); }
-.tab-btn.active[data-tab="private"] { background: rgba(59, 130, 246, 0.16); }
 .tab-btn:not(.active):hover { color: var(--text-primary); }
+
+/* The work tab-bar disappears entirely while in プライベート, so switching
+   feels like leaving to a different place rather than picking a tab. */
+body.tab-private .tab-bar { display: none; }
+
+/* One small, quiet button that swaps role: "プライベート" from work,
+   "仕事に戻る" once inside — never a third equal-weight tab. */
+.private-toggle-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: 1px solid var(--panel-border);
+  color: var(--text-muted);
+  font-family: inherit;
+  font-size: 12.5px;
+  padding: 7px 14px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+.private-toggle-btn:hover { color: var(--text-secondary); border-color: rgba(255,255,255,0.14); }
+.private-toggle-btn.active {
+  color: #bfe0ff;
+  border-color: rgba(59, 130, 246, 0.4);
+  background: rgba(59, 130, 246, 0.12);
+}
 
 .presence-avatar.is-self {
   cursor: pointer;

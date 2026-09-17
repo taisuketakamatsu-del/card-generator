@@ -794,22 +794,45 @@
   // Tabs: shared / 完了済み / private
   // ---------------------------------------------------------------------
   const tabBar = document.getElementById("tabBar");
+  const privateToggleBtn = document.getElementById("privateToggleBtn");
+  const privateToggleLabel = document.getElementById("privateToggleLabel");
+  const iconLock = privateToggleBtn.querySelector(".icon-lock");
+  const iconBack = privateToggleBtn.querySelector(".icon-back");
   const sharedView = document.getElementById("sharedView");
   const completedView = document.getElementById("completedView");
   const privateView = document.getElementById("privateView");
   let currentTab = "shared";
+  let lastWorkTab = "shared"; // remembers which work tab to return to
 
   tabBar.querySelectorAll(".tab-btn").forEach((btn) => {
     btn.addEventListener("click", () => setTab(btn.dataset.tab));
   });
+  // One button does both jobs: "プライベートへ" from work, "仕事に戻る" from
+  // private — a single swap instead of a third equal-weight tab, so
+  // entering/leaving private reads as switching to a different place
+  // entirely rather than picking another tab.
+  privateToggleBtn.addEventListener("click", () => setTab(currentTab === "private" ? lastWorkTab : "private"));
 
   function setTab(tab) {
+    // プライベート is deliberately separate from the 仕事/完了済み pair —
+    // leaving it always re-locks it, so the passcode is asked again every
+    // time, not just once per page load.
+    if (currentTab === "private" && tab !== "private") lockPrivate();
+    if (tab !== "private") lastWorkTab = tab;
+
     currentTab = tab;
     tabBar.querySelectorAll(".tab-btn").forEach((b) => b.classList.toggle("active", b.dataset.tab === tab));
     sharedView.classList.toggle("active", tab === "shared");
     completedView.classList.toggle("active", tab === "completed");
     privateView.classList.toggle("active", tab === "private");
     document.body.classList.toggle("tab-private", tab === "private");
+
+    const inPrivate = tab === "private";
+    privateToggleLabel.textContent = inPrivate ? "仕事に戻る" : "プライベート";
+    iconLock.style.display = inPrivate ? "none" : "block";
+    iconBack.style.display = inPrivate ? "block" : "none";
+    privateToggleBtn.classList.toggle("active", inPrivate);
+
     if (tab === "completed") renderCompleted();
     if (tab === "private" && !privateUnlocked) setTimeout(() => privatePasswordInput.focus(), 30);
   }
@@ -827,7 +850,6 @@
   let privateUnlocked = false;
 
   function localPassKey() { return `taisk.private.pass.${currentNickname}`; }
-  function rememberKey() { return `taisk.private.remember.${currentNickname}`; }
 
   function showPrivateLocked() {
     privateLocked.style.display = "flex";
@@ -842,6 +864,15 @@
     privateContent.style.display = "flex";
     privateUnlocked = true;
     await privateStore.init(REMOTE_ENABLED ? sb : null);
+  }
+
+  // プライベート asks for the passcode every time you enter it — leaving
+  // (or reloading) re-locks it rather than remembering the device.
+  function lockPrivate() {
+    privateUnlocked = false;
+    if (privateStore.channel) privateStore.teardown();
+    if (REMOTE_ENABLED) sb.auth.signOut();
+    showPrivateLocked();
   }
 
   // First password typed for a nickname becomes its passcode automatically
@@ -868,27 +899,10 @@
         privateError.textContent = "パスコードが違います";
         return;
       }
-      localStorage.setItem(rememberKey(), "1");
       await showPrivateContent();
     }
   });
   privatePasswordInput.addEventListener("keydown", (e) => { if (e.key === "Enter") privateUnlockBtn.click(); });
-
-  // Remembers this device once unlocked, so the passcode doesn't need to be
-  // re-typed on every visit (local mode: a "trust this browser" flag;
-  // remote mode: Supabase Auth's own persisted session).
-  async function tryAutoUnlockPrivate() {
-    if (REMOTE_ENABLED) {
-      const { data } = await sb.auth.getSession();
-      if (data && data.session) { await showPrivateContent(); return true; }
-      return false;
-    }
-    if (currentNickname && localStorage.getItem(rememberKey()) && localStorage.getItem(localPassKey())) {
-      await showPrivateContent();
-      return true;
-    }
-    return false;
-  }
 
   // ---------------------------------------------------------------------
   // Presence ("who is viewing now", Google Slides style avatar stack)
@@ -937,8 +951,10 @@
       setTimeout(() => nicknameInput.focus(), 30);
     }
     await sharedStore.init(REMOTE_ENABLED ? sb : null);
-    const autoUnlocked = await tryAutoUnlockPrivate();
-    if (!autoUnlocked) showPrivateLocked();
+    // Always start プライベート locked — no remembered session across
+    // reloads, even when Supabase Auth would otherwise keep one alive.
+    if (REMOTE_ENABLED) await sb.auth.signOut();
+    showPrivateLocked();
     setupPresence();
   }
 
