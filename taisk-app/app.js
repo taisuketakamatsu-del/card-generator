@@ -582,6 +582,7 @@
     seedFn: () => [],
     showOwner: false,
     els: privateEls,
+    afterRender: () => renderCompletedPriv(),
   });
 
   // ---------------------------------------------------------------------
@@ -735,25 +736,23 @@
   nicknameInput.addEventListener("keydown", (e) => { if (e.key === "Enter") confirmNickname(); });
 
   // ---------------------------------------------------------------------
-  // Completed tasks archive (kept 30 days, restorable) — shared board only
+  // Completed tasks archive (kept 30 days, restorable). 仕事 and
+  // プライベート each get their own — never mixed together.
   // ---------------------------------------------------------------------
-  const completedList = document.getElementById("completedList");
-  const completedCount = document.getElementById("completedCount");
-
-  function renderCompleted() {
+  function renderCompletedInto(store, listEl, countEl) {
     const cutoff = Date.now() - THIRTY_DAYS_MS;
-    const items = sharedStore.tasks
+    const items = store.tasks
       .filter((t) => t.done && (!t.completed_at || t.completed_at >= cutoff))
       .sort((a, b) => (b.completed_at || 0) - (a.completed_at || 0));
 
-    completedCount.textContent = items.length;
-    completedList.innerHTML = "";
+    countEl.textContent = items.length;
+    listEl.innerHTML = "";
 
     if (items.length === 0) {
       const empty = document.createElement("div");
       empty.className = "column-empty";
       empty.textContent = "完了したタスクはまだありません。";
-      completedList.appendChild(empty);
+      listEl.appendChild(empty);
       return;
     }
 
@@ -765,7 +764,7 @@
       check.className = "check-circle checked";
       check.innerHTML = CHECK_ICON;
       check.title = "未完了に戻す";
-      check.addEventListener("click", () => sharedStore.restoreTask(task.id));
+      check.addEventListener("click", () => store.restoreTask(task.id));
       row.appendChild(check);
 
       const title = document.createElement("div");
@@ -776,19 +775,42 @@
       const restoreBtn = document.createElement("button");
       restoreBtn.className = "btn-ghost restore-btn";
       restoreBtn.textContent = "復元";
-      restoreBtn.addEventListener("click", () => sharedStore.restoreTask(task.id));
+      restoreBtn.addEventListener("click", () => store.restoreTask(task.id));
       row.appendChild(restoreBtn);
 
       const delBtn = document.createElement("button");
       delBtn.className = "more-btn always-visible";
       delBtn.textContent = "✕";
       delBtn.title = "完全に削除";
-      delBtn.addEventListener("click", () => sharedStore.deleteTask(task.id));
+      delBtn.addEventListener("click", () => store.deleteTask(task.id));
       row.appendChild(delBtn);
 
-      completedList.appendChild(row);
+      listEl.appendChild(row);
     });
   }
+
+  const completedList = document.getElementById("completedList");
+  const completedCount = document.getElementById("completedCount");
+  function renderCompleted() { renderCompletedInto(sharedStore, completedList, completedCount); }
+
+  const completedListPriv = document.getElementById("completedListPriv");
+  const completedCountPriv = document.getElementById("completedCountPriv");
+  function renderCompletedPriv() { renderCompletedInto(privateStore, completedListPriv, completedCountPriv); }
+
+  // プライベート's own mini tab strip (タスク / 完了済み), independent of
+  // the outer 仕事/完了済み tabs.
+  const privateSubTabBar = document.getElementById("privateSubTabBar");
+  const privateBoardWrap = document.getElementById("privateBoardWrap");
+  const privateCompletedWrap = document.getElementById("privateCompletedWrap");
+  privateSubTabBar.querySelectorAll(".sub-tab-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const sub = btn.dataset.subtab;
+      privateSubTabBar.querySelectorAll(".sub-tab-btn").forEach((b) => b.classList.toggle("active", b === btn));
+      privateBoardWrap.classList.toggle("active", sub === "board");
+      privateCompletedWrap.classList.toggle("active", sub === "completed");
+      if (sub === "completed") renderCompletedPriv();
+    });
+  });
 
   // ---------------------------------------------------------------------
   // Tabs: shared / 完了済み / private
@@ -876,6 +898,10 @@
     privateLocked.style.display = "none";
     privateContent.style.display = "flex";
     privateUnlocked = true;
+    // Always land on the task board, not wherever the sub-tab was left.
+    privateSubTabBar.querySelectorAll(".sub-tab-btn").forEach((b) => b.classList.toggle("active", b.dataset.subtab === "board"));
+    privateBoardWrap.classList.add("active");
+    privateCompletedWrap.classList.remove("active");
     await privateStore.init(REMOTE_ENABLED ? sb : null);
   }
 

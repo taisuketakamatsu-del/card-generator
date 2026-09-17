@@ -226,6 +226,41 @@ body.tab-private .tab-bar { display: none; }
   flex-direction: column;
 }
 
+/* プライベート's own mini tab strip (タスク / 完了済み) — kept inside the
+   private view itself, entirely separate from 仕事's 完了済み. */
+.sub-tab-bar {
+  flex: none;
+  display: flex;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+.sub-tab-btn {
+  background: transparent;
+  border: 1px solid var(--panel-border);
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 500;
+  padding: 6px 14px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: color 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+}
+.sub-tab-btn.active {
+  color: #bfe0ff;
+  background: rgba(59, 130, 246, 0.14);
+  border-color: rgba(59, 130, 246, 0.35);
+}
+.sub-tab-btn:not(.active):hover { color: var(--text-primary); }
+
+.sub-view {
+  display: none;
+  flex: 1;
+  min-height: 0;
+  flex-direction: column;
+}
+.sub-view.active { display: flex; }
+
 .private-locked {
   display: flex;
   flex-direction: column;

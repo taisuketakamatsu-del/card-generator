@@ -90,17 +90,30 @@
     </div>
 
     <div class="private-content" id="privateContent" style="display:none;">
-      <section class="now-section">
-        <div class="section-title">
-          <span>いまやる</span>
-          <span class="badge" id="nowCountPriv">0</span>
-        </div>
-        <div class="now-list" id="nowListPriv"></div>
-      </section>
+      <nav class="sub-tab-bar" id="privateSubTabBar">
+        <button type="button" class="sub-tab-btn active" data-subtab="board">タスク</button>
+        <button type="button" class="sub-tab-btn" data-subtab="completed">完了済み</button>
+      </nav>
 
-      <section class="board" id="boardPriv">
-        <!-- columns injected by app.js -->
-      </section>
+      <div class="sub-view active" id="privateBoardWrap">
+        <section class="now-section">
+          <div class="section-title">
+            <span>いまやる</span>
+            <span class="badge" id="nowCountPriv">0</span>
+          </div>
+          <div class="now-list" id="nowListPriv"></div>
+        </section>
+
+        <section class="board" id="boardPriv">
+          <!-- columns injected by app.js -->
+        </section>
+      </div>
+
+      <div class="sub-view" id="privateCompletedWrap">
+        <div class="section-title"><span>完了済み</span><span class="badge" id="completedCountPriv">0</span></div>
+        <p class="modal-sub" style="margin:-4px 0 14px;">仕事側とは別に、プライベートだけの完了記録です。30日間残ります。</p>
+        <div class="completed-list" id="completedListPriv"></div>
+      </div>
     </div>
   </div>
 
