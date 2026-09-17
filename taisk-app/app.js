@@ -104,21 +104,35 @@
     if (e.key === "Escape") closeMenus();
   });
 
-  function makeCheckCircle(onCheck) {
-    const btn = document.createElement("button");
-    btn.className = "check-circle";
-    btn.innerHTML = CHECK_ICON;
-    btn.title = "完了にする";
-    // Explicitly non-draggable: the row itself is draggable(for reordering
-    // /moving), and without this a mousedown here can get hijacked as a
-    // drag-start instead of registering as a click.
-    btn.draggable = false;
-    btn.addEventListener("mousedown", (e) => e.stopPropagation());
-    btn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      onCheck();
+  // Purely visual now — the whole row is the tap target (see
+  // attachTapToComplete), so this is a <span>, not an interactive button.
+  function makeCheckIcon() {
+    const el = document.createElement("span");
+    el.className = "check-circle";
+    el.innerHTML = CHECK_ICON;
+    return el;
+  }
+
+  // Tapping anywhere on a row completes it — but not instantly: it shows
+  // checked/struck-through first, and a second tap within the window
+  // cancels the completion. Only after the window elapses does it actually
+  // persist and disappear from the active list.
+  function attachTapToComplete(row, task, store) {
+    let pendingTimer = null;
+    row.addEventListener("click", (e) => {
+      if (e.target.closest(".more-btn") || e.target.closest(".row-menu")) return;
+      if (pendingTimer) {
+        clearTimeout(pendingTimer);
+        pendingTimer = null;
+        row.classList.remove("done");
+        return;
+      }
+      row.classList.add("done");
+      pendingTimer = setTimeout(() => {
+        pendingTimer = null;
+        store.toggleDone(task.id);
+      }, 1300);
     });
-    return btn;
   }
 
   function buildMenu(task, actions) {
@@ -227,7 +241,7 @@
         e.dataTransfer.effectAllowed = "move";
       });
       row.addEventListener("dragend", () => row.classList.remove("dragging"));
-      row.addEventListener("click", () => store.openEdit(task.id));
+      attachTapToComplete(row, task, store);
 
       const actions = {
         onEdit: () => store.openEdit(task.id),
@@ -236,7 +250,7 @@
       };
       attachContextMenu(row, task, actions);
 
-      row.appendChild(makeCheckCircle(() => store.toggleDone(task.id, row)));
+      row.appendChild(makeCheckIcon());
       const title = document.createElement("div");
       title.className = "task-title";
       title.textContent = task.title;
@@ -288,7 +302,7 @@
           e.dataTransfer.effectAllowed = "move";
         });
         row.addEventListener("dragend", () => row.classList.remove("dragging"));
-        row.addEventListener("click", () => store.openEdit(task.id));
+        attachTapToComplete(row, task, store);
 
         const actions = {
           onEdit: () => store.openEdit(task.id),
@@ -297,7 +311,7 @@
         };
         attachContextMenu(row, task, actions);
 
-        row.appendChild(makeCheckCircle(() => store.toggleDone(task.id, row)));
+        row.appendChild(makeCheckIcon());
         const title = document.createElement("div");
         title.className = "task-title";
         title.textContent = task.title;
@@ -506,12 +520,8 @@
       store.updateTask(id, { pinned: !t.pinned });
     };
 
-    store.toggleDone = function (id, rowEl) {
+    store.toggleDone = function (id) {
       store.updateTask(id, { done: true, completed_at: Date.now() });
-      if (rowEl) {
-        rowEl.classList.add("done");
-        if (!store.authClient) setTimeout(() => store.render(), 260);
-      }
     };
 
     store.restoreTask = function (id) {
@@ -801,6 +811,7 @@
     privateView.classList.toggle("active", tab === "private");
     document.body.classList.toggle("tab-private", tab === "private");
     if (tab === "completed") renderCompleted();
+    if (tab === "private" && !privateUnlocked) setTimeout(() => privatePasswordInput.focus(), 30);
   }
 
   // ---------------------------------------------------------------------
@@ -811,32 +822,19 @@
   const privateContent = document.getElementById("privateContent");
   const privatePasswordInput = document.getElementById("privatePasswordInput");
   const privateUnlockBtn = document.getElementById("privateUnlockBtn");
-  const privateModeToggle = document.getElementById("privateModeToggle");
   const privateError = document.getElementById("privateError");
 
   let privateUnlocked = false;
-  let privateSignupMode = false;
 
   function localPassKey() { return `taisk.private.pass.${currentNickname}`; }
-
-  function setPrivateSignupMode(on) {
-    privateSignupMode = on;
-    privateUnlockBtn.textContent = on ? "登録する" : "ログイン";
-    privateModeToggle.textContent = on ? "ログインに戻る" : "はじめての方はこちら(登録)";
-    privateError.textContent = "";
-  }
+  function rememberKey() { return `taisk.private.remember.${currentNickname}`; }
 
   function showPrivateLocked() {
     privateLocked.style.display = "flex";
     privateContent.style.display = "none";
     privatePasswordInput.value = "";
     privateError.textContent = "";
-    if (!REMOTE_ENABLED) {
-      const hasLocalAccount = !!localStorage.getItem(localPassKey());
-      setPrivateSignupMode(!hasLocalAccount);
-    } else {
-      setPrivateSignupMode(false);
-    }
+    if (currentTab === "private") setTimeout(() => privatePasswordInput.focus(), 30);
   }
 
   async function showPrivateContent() {
@@ -846,38 +844,51 @@
     await privateStore.init(REMOTE_ENABLED ? sb : null);
   }
 
-  privateModeToggle.addEventListener("click", () => setPrivateSignupMode(!privateSignupMode));
-
+  // First password typed for a nickname becomes its passcode automatically
+  // — no separate "sign up" step to think about.
   privateUnlockBtn.addEventListener("click", async () => {
     if (!currentNickname) { showToast("先にニックネームを登録してください"); openNicknameModal(); return; }
     const pw = privatePasswordInput.value;
-    if (!pw || pw.length < 4) { privateError.textContent = "パスワードは4文字以上にしてください"; return; }
+    if (!pw || pw.length < 4) { privateError.textContent = "4文字以上のパスコードを入力してください"; return; }
 
     if (REMOTE_ENABLED) {
       const email = nickToEmail(currentNickname);
-      if (privateSignupMode) {
-        const { error } = await sb.auth.signUp({ email, password: pw });
-        if (error) { privateError.textContent = "登録に失敗しました: " + error.message; return; }
-        showToast("プライベートアカウントを作成しました");
-        await showPrivateContent();
-      } else {
-        const { error } = await sb.auth.signInWithPassword({ email, password: pw });
-        if (error) { privateError.textContent = "パスワードが違います"; return; }
-        await showPrivateContent();
+      let { error } = await sb.auth.signInWithPassword({ email, password: pw });
+      if (error) {
+        const signup = await sb.auth.signUp({ email, password: pw });
+        if (signup.error) { privateError.textContent = "開けませんでした: " + signup.error.message; return; }
       }
+      await showPrivateContent();
     } else {
-      if (privateSignupMode) {
-        localStorage.setItem(localPassKey(), await sha256Hex(pw));
-        showToast("このブラウザ用にプライベートを設定しました");
-        await showPrivateContent();
-      } else {
-        const stored = localStorage.getItem(localPassKey());
-        const hash = await sha256Hex(pw);
-        if (stored !== hash) { privateError.textContent = "パスワードが違います"; return; }
-        await showPrivateContent();
+      const stored = localStorage.getItem(localPassKey());
+      const hash = await sha256Hex(pw);
+      if (!stored) {
+        localStorage.setItem(localPassKey(), hash);
+      } else if (stored !== hash) {
+        privateError.textContent = "パスコードが違います";
+        return;
       }
+      localStorage.setItem(rememberKey(), "1");
+      await showPrivateContent();
     }
   });
+  privatePasswordInput.addEventListener("keydown", (e) => { if (e.key === "Enter") privateUnlockBtn.click(); });
+
+  // Remembers this device once unlocked, so the passcode doesn't need to be
+  // re-typed on every visit (local mode: a "trust this browser" flag;
+  // remote mode: Supabase Auth's own persisted session).
+  async function tryAutoUnlockPrivate() {
+    if (REMOTE_ENABLED) {
+      const { data } = await sb.auth.getSession();
+      if (data && data.session) { await showPrivateContent(); return true; }
+      return false;
+    }
+    if (currentNickname && localStorage.getItem(rememberKey()) && localStorage.getItem(localPassKey())) {
+      await showPrivateContent();
+      return true;
+    }
+    return false;
+  }
 
   // ---------------------------------------------------------------------
   // Presence ("who is viewing now", Google Slides style avatar stack)
@@ -926,7 +937,8 @@
       setTimeout(() => nicknameInput.focus(), 30);
     }
     await sharedStore.init(REMOTE_ENABLED ? sb : null);
-    showPrivateLocked();
+    const autoUnlocked = await tryAutoUnlockPrivate();
+    if (!autoUnlocked) showPrivateLocked();
     setupPresence();
   }
 
