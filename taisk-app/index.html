@@ -8,13 +8,23 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="styles.css" />
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 </head>
 <body>
 <div class="app">
 
   <header class="topbar">
     <div class="logo">t&thinsp;a&thinsp;i&thinsp;s&thinsp;k</div>
-    <div class="actions">
+
+    <div class="topbar-right">
+      <div class="presence-stack" id="presenceStack" title="今見ている人"></div>
+
+      <nav class="tab-bar" id="tabBar">
+        <button type="button" class="tab-btn active" data-tab="shared">タスク</button>
+        <button type="button" class="tab-btn" data-tab="private">プライベート</button>
+        <span class="tab-indicator" id="tabIndicator"></span>
+      </nav>
+
       <button class="btn-share" id="shareBtn" title="タスクを共有">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
         <span>共有</span>
@@ -25,20 +35,74 @@
     </div>
   </header>
 
-  <section class="now-section">
-    <div class="section-title">
-      <span>いまやる</span>
-      <span class="badge" id="nowCount">0</span>
-    </div>
-    <div class="now-list" id="nowList"></div>
-  </section>
+  <div class="whoami" id="whoami">
+    <button type="button" class="whoami-btn" id="whoamiBtn"></button>
+  </div>
 
-  <section class="board" id="board">
-    <!-- columns injected by app.js -->
-  </section>
+  <!-- ---------- Shared board ---------- -->
+  <div class="view active" id="sharedView">
+    <section class="now-section">
+      <div class="section-title">
+        <span>いまやる</span>
+        <span class="badge" id="nowCount">0</span>
+      </div>
+      <div class="now-list" id="nowList"></div>
+    </section>
+
+    <section class="board" id="board">
+      <!-- columns injected by app.js -->
+    </section>
+  </div>
+
+  <!-- ---------- Private board ---------- -->
+  <div class="view private-theme" id="privateView">
+    <div class="private-locked" id="privateLocked">
+      <div class="lock-icon">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="9" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+      </div>
+      <h3>プライベートタスク</h3>
+      <p>ここはあなただけのタスク置き場です。パスワードでロックされています。</p>
+
+      <input id="privatePasswordInput" class="text-input" type="password" placeholder="パスワード" autocomplete="current-password" />
+      <input id="privatePasswordConfirm" class="text-input" type="password" placeholder="パスワード(確認)" autocomplete="new-password" style="display:none;" />
+
+      <button class="btn-primary" id="privateUnlockBtn">ログイン</button>
+      <button type="button" class="link-btn" id="privateModeToggle">はじめての方はこちら(登録)</button>
+      <p class="private-error" id="privateError"></p>
+    </div>
+
+    <div class="private-content" id="privateContent" style="display:none;">
+      <section class="now-section">
+        <div class="section-title">
+          <span>いまやる</span>
+          <span class="badge" id="nowCountPriv">0</span>
+        </div>
+        <div class="now-list" id="nowListPriv"></div>
+      </section>
+
+      <section class="board" id="boardPriv">
+        <!-- columns injected by app.js -->
+      </section>
+    </div>
+  </div>
 
 </div>
 
+<!-- Nickname registration (required before using the app) -->
+<div class="modal-overlay" id="nicknameOverlay">
+  <div class="modal">
+    <h3>ようこそ taisk へ</h3>
+    <p class="modal-sub">今このアプリを見ている人が分かるように、ニックネームを登録してください。</p>
+    <label class="field-label">ニックネーム</label>
+    <input id="nicknameInput" class="text-input" placeholder="例: たかまつ" maxlength="24" />
+    <div class="modal-actions">
+      <div class="spacer"></div>
+      <button class="btn-primary" id="nicknameSaveBtn">はじめる</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add / edit task -->
 <div class="modal-overlay" id="modalOverlay">
   <div class="modal">
     <h3 id="modalTitle">新しいタスク</h3>
@@ -70,6 +134,7 @@
 
 <div class="toast" id="toast"></div>
 
+<script src="config.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
