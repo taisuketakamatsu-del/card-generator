@@ -141,19 +141,36 @@ html, body {
 }
 .now-row:hover { background: var(--row-bg-hover); }
 
+/* Rank is conveyed purely by color intensity: rank 1 is the brightest,
+   full-opacity accent + a soft glow; each rank after that steps down via
+   --rank-opacity (set inline per row from JS). No numbers needed. */
 .now-row::before {
   content: "";
   position: absolute;
   left: 0; top: 0; bottom: 0;
   width: 6px;
-  background: var(--accent);
+  background: var(--accent-grad);
+  opacity: var(--rank-opacity, 1);
   border-top-left-radius: var(--radius-lg);
   border-bottom-left-radius: var(--radius-lg);
+  transition: opacity 0.15s ease;
 }
 
-.now-row.accent-0::before { background: linear-gradient(180deg, var(--purple), var(--violet)); }
-.now-row.accent-1::before { background: linear-gradient(180deg, var(--violet), var(--blue)); }
-.now-row.accent-2::before { background: linear-gradient(180deg, var(--blue), var(--lightblue)); }
+.now-row::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius-lg);
+  background: linear-gradient(90deg, rgba(124, 92, 252, 0.10), transparent 55%);
+  opacity: var(--rank-opacity, 1);
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+}
+
+.now-row.rank-1 {
+  border-color: rgba(139, 92, 246, 0.35);
+  box-shadow: 0 0 0 1px rgba(139, 92, 246, 0.12), 0 8px 24px rgba(99, 102, 241, 0.12);
+}
 
 .now-row.done { opacity: 0.35; }
 .now-row.done .task-title { text-decoration: line-through; }

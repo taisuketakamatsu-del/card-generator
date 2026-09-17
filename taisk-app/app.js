@@ -213,7 +213,12 @@
 
     pinned.forEach((task, i) => {
       const row = document.createElement("div");
-      row.className = `now-row accent-${i % 3}`;
+      const rank = i + 1;
+      row.className = "now-row" + (rank === 1 ? " rank-1" : "");
+      // Rank shown purely by color intensity: brightest = highest priority.
+      const opacity = Math.max(1 - i * 0.3, 0.28);
+      row.style.setProperty("--rank-opacity", opacity.toFixed(2));
+      row.title = `優先度 ${rank}`;
       row.addEventListener("click", () => openEditModal(task.id));
 
       const check = makeCheckCircle(task, row);
