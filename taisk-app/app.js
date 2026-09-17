@@ -590,7 +590,10 @@
   // ---------------------------------------------------------------------
   const modalOverlay = document.getElementById("modalOverlay");
   const modalTitle = document.getElementById("modalTitle");
+  const taskTitleLabel = document.getElementById("taskTitleLabel");
   const taskTitleInput = document.getElementById("taskTitleInput");
+  const taskBulkInput = document.getElementById("taskBulkInput");
+  const bulkModeToggle = document.getElementById("bulkModeToggle");
   const bucketPicker = document.getElementById("bucketPicker");
   const pinCheckbox = document.getElementById("pinCheckbox");
   const saveBtn = document.getElementById("saveBtn");
@@ -601,6 +604,17 @@
 
   let activeStore = sharedStore;
   let modalEditingId = null;
+  let bulkMode = false;
+
+  function setBulkMode(on) {
+    bulkMode = on;
+    taskTitleInput.style.display = on ? "none" : "block";
+    taskBulkInput.style.display = on ? "block" : "none";
+    taskTitleLabel.textContent = on ? "タスク名(1行に1つ)" : "タスク名";
+    saveBtn.textContent = on ? "まとめて追加" : "追加";
+    if (on) { taskBulkInput.value = ""; setTimeout(() => taskBulkInput.focus(), 30); }
+  }
+  bulkModeToggle.addEventListener("click", () => setBulkMode(!bulkMode));
 
   function setSelectedBucket(store, bucketKey) {
     store.selectedBucket = bucketKey;
@@ -615,6 +629,8 @@
   function openTaskModal(store, id, presetBucket) {
     activeStore = store;
     modalEditingId = id || null;
+    setBulkMode(false);
+    bulkModeToggle.style.display = id ? "none" : "inline-block";
     if (id) {
       const task = store.tasks.find((t) => t.id === id);
       if (!task) return;
@@ -642,6 +658,16 @@
   }
 
   function saveTaskModal() {
+    if (bulkMode && !modalEditingId) {
+      const lines = taskBulkInput.value.split("\n").map((l) => l.trim()).filter(Boolean);
+      if (!lines.length) { taskBulkInput.focus(); return; }
+      lines.forEach((title) => {
+        activeStore.addTask({ title, bucket: activeStore.selectedBucket, pinned: pinCheckbox.checked });
+      });
+      showToast(`${lines.length}件のタスクを追加しました`);
+      closeTaskModal();
+      return;
+    }
     const title = taskTitleInput.value.trim();
     if (!title) { taskTitleInput.focus(); return; }
     const payload = { title, bucket: activeStore.selectedBucket, pinned: pinCheckbox.checked };
@@ -864,6 +890,7 @@
 
     const inPrivate = tab === "private";
     privateToggleLabel.textContent = inPrivate ? "仕事に戻る" : "プライベート";
+    privateToggleBtn.title = inPrivate ? "仕事に戻る" : "プライベート";
     iconLock.style.display = inPrivate ? "none" : "block";
     iconBack.style.display = inPrivate ? "block" : "none";
     privateToggleBtn.classList.toggle("active", inPrivate);
@@ -880,6 +907,7 @@
   const privateContent = document.getElementById("privateContent");
   const privatePasswordInput = document.getElementById("privatePasswordInput");
   const privateUnlockBtn = document.getElementById("privateUnlockBtn");
+  const privateResetBtn = document.getElementById("privateResetBtn");
   const privateError = document.getElementById("privateError");
 
   let privateUnlocked = false;
@@ -919,7 +947,7 @@
   privateUnlockBtn.addEventListener("click", async () => {
     if (!currentNickname) { showToast("先にニックネームを登録してください"); openNicknameModal(); return; }
     const pw = privatePasswordInput.value;
-    if (!pw || pw.length < 4) { privateError.textContent = "4文字以上のパスコードを入力してください"; return; }
+    if (!pw || pw.length < 2) { privateError.textContent = "2文字以上のパスコードを入力してください"; return; }
 
     if (REMOTE_ENABLED) {
       const email = nickToEmail(currentNickname);
@@ -942,6 +970,21 @@
     }
   });
   privatePasswordInput.addEventListener("keydown", (e) => { if (e.key === "Enter") privateUnlockBtn.click(); });
+
+  // Local-only mode has no real recovery flow — resetting just forgets the
+  // stored passcode hash so the next entry becomes the new one. Private
+  // tasks themselves are untouched (different storage key).
+  if (REMOTE_ENABLED) {
+    privateResetBtn.style.display = "none";
+  } else {
+    privateResetBtn.addEventListener("click", () => {
+      if (!currentNickname) return;
+      localStorage.removeItem(localPassKey());
+      privateError.textContent = "";
+      showToast("パスコードをリセットしました。次に入力した内容が新しいパスコードになります");
+      privatePasswordInput.focus();
+    });
+  }
 
   // ---------------------------------------------------------------------
   // Presence ("who is viewing now", Google Slides style avatar stack)

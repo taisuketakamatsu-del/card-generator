@@ -36,10 +36,10 @@
         <button type="button" class="tab-btn" data-tab="completed">完了済み</button>
       </nav>
 
-      <button type="button" class="private-toggle-btn" id="privateToggleBtn" title="プライベート">
-        <svg class="icon-lock" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="9" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
-        <svg class="icon-back" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none;"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
-        <span id="privateToggleLabel">プライベート</span>
+      <button type="button" class="private-toggle-btn icon-only" id="privateToggleBtn" title="プライベート">
+        <svg class="icon-lock" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="9" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+        <svg class="icon-back" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none;"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+        <span id="privateToggleLabel" class="sr-only">プライベート</span>
       </button>
 
       <button class="btn-share" id="shareBtn" title="タスクを共有">
@@ -86,6 +86,7 @@
       <input id="privatePasswordInput" class="text-input" type="password" placeholder="パスコード" autocomplete="current-password" />
 
       <button class="btn-primary" id="privateUnlockBtn">開く</button>
+      <button type="button" class="link-btn" id="privateResetBtn">パスコードを忘れた場合はリセット</button>
       <p class="private-error" id="privateError"></p>
     </div>
 
@@ -159,8 +160,10 @@
   <div class="modal">
     <h3 id="modalTitle">新しいタスク</h3>
 
-    <label class="field-label">タスク名</label>
+    <label class="field-label" id="taskTitleLabel">タスク名</label>
     <input id="taskTitleInput" class="text-input" placeholder="タスク名を入力" maxlength="120" />
+    <textarea id="taskBulkInput" class="text-input" placeholder="1行に1つずつタスク名を貼り付け" rows="6" style="display:none; resize:vertical;"></textarea>
+    <button type="button" class="link-btn" id="bulkModeToggle" style="margin-top:6px;">複数行でまとめて追加</button>
 
     <label class="field-label">期限</label>
     <div class="bucket-picker" id="bucketPicker">
