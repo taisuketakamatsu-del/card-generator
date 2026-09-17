@@ -8,10 +8,11 @@
 create table if not exists public.tasks (
   id uuid primary key default gen_random_uuid(),
   title text not null,
-  bucket text not null check (bucket in ('today', 'week', 'month', 'later')),
+  bucket text not null check (bucket in ('week', 'month', 'later')),
   pinned boolean not null default false,
   priority integer not null default 0,
   done boolean not null default false,
+  completed_at timestamptz,
   owner_name text not null,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -39,10 +40,11 @@ alter publication supabase_realtime add table public.tasks;
 create table if not exists public.private_tasks (
   id uuid primary key default gen_random_uuid(),
   title text not null,
-  bucket text not null check (bucket in ('today', 'week', 'month', 'later')),
+  bucket text not null check (bucket in ('week', 'month', 'later')),
   pinned boolean not null default false,
   priority integer not null default 0,
   done boolean not null default false,
+  completed_at timestamptz,
   owner_id uuid not null references auth.users (id) on delete cascade,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()

@@ -129,40 +129,13 @@ html, body {
 }
 .tab-btn.active { color: #fff; }
 .tab-btn.active[data-tab="shared"] { background: rgba(124, 92, 252, 0.28); }
+.tab-btn.active[data-tab="completed"] { background: rgba(148, 163, 184, 0.28); }
 .tab-btn.active[data-tab="private"] { background: rgba(59, 130, 246, 0.28); }
 .tab-btn:not(.active):hover { color: var(--text-primary); }
-.tab-indicator { display: none; }
 
-/* ---------- Who am I ---------- */
-.whoami {
-  flex: none;
-  display: flex;
-  justify-content: flex-end;
-  margin: -8px 0 14px;
-}
-.whoami-btn {
-  background: transparent;
-  border: none;
-  color: var(--text-muted);
-  font-family: inherit;
-  font-size: 12px;
+.presence-avatar.is-self {
   cursor: pointer;
-  padding: 2px 4px;
-}
-.whoami-btn:hover { color: var(--text-secondary); text-decoration: underline; }
-
-/* ---------- Owner badge ---------- */
-.owner-badge {
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  flex: none;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 11px;
-  font-weight: 700;
-  color: #fff;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.55);
 }
 
 /* ---------- Views (shared / private) ---------- */
@@ -315,22 +288,27 @@ body.tab-private .btn-add {
 }
 
 /* ---------- Now section ---------- */
+/* This is the most-looked-at part of the app, so it is never the thing
+   that scrolls or shrinks — it sizes to its content and the board below
+   gives up space for it instead (the board's own columns scroll
+   internally if they overflow). */
 .now-section {
   flex: none;
-  max-height: 34%;
   margin-bottom: 20px;
   display: flex;
   flex-direction: column;
-  min-height: 0;
 }
 
 .now-list {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  overflow-y: auto;
-  min-height: 0;
-  padding: 2px 4px 2px 2px;
+}
+
+.now-list.drag-over-now {
+  outline: 2px dashed rgba(124, 92, 252, 0.4);
+  outline-offset: 6px;
+  border-radius: var(--radius-lg);
 }
 
 .now-row {
@@ -341,12 +319,17 @@ body.tab-private .btn-add {
   background: var(--row-bg);
   border: 1px solid var(--panel-border);
   border-radius: var(--radius-lg);
-  padding: 16px 20px;
+  padding: calc(14px * var(--rank-scale, 1)) calc(20px * var(--rank-scale, 1));
   flex: none;
-  transition: background 0.15s ease;
+  transition: background 0.15s ease, padding 0.15s ease;
   cursor: pointer;
 }
 .now-row:hover { background: var(--row-bg-hover); }
+.now-row .task-title {
+  font-size: calc(15px * var(--rank-scale, 1));
+  transition: font-size 0.15s ease;
+}
+.now-row.rank-1 .task-title { font-weight: 700; }
 
 /* Rank is conveyed purely by color intensity: rank 1 is the brightest,
    full-opacity accent + a soft glow; each rank after that steps down via
@@ -379,19 +362,38 @@ body.tab-private .btn-add {
   box-shadow: 0 0 0 1px rgba(139, 92, 246, 0.12), 0 8px 24px rgba(99, 102, 241, 0.12);
 }
 
+.now-row.dragging { opacity: 0.4; }
 .now-row.done { opacity: 0.35; }
 .now-row.done .task-title { text-decoration: line-through; }
+
+/* Pinned tasks beyond the top 3 spill into a compact "最近" group instead
+   of growing the spotlight list without bound. */
+.now-overflow-label {
+  flex: none;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  letter-spacing: 0.08em;
+  margin: 6px 2px 0;
+}
+.now-row.overflow {
+  padding: 10px 16px;
+  opacity: 0.6;
+}
+.now-row.overflow .task-title { font-size: 13.5px; }
+.now-row.overflow::before { opacity: 0.25; }
+.now-row.overflow::after { display: none; }
 
 /* ---------- Board ---------- */
 .board {
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 18px;
 }
 
-@media (max-width: 1100px) {
+@media (max-width: 900px) {
   .board { grid-template-columns: repeat(2, 1fr); }
 }
 @media (max-width: 620px) {
@@ -447,6 +449,22 @@ body.tab-private .btn-add {
   font-weight: 600;
   flex: 1;
 }
+
+.col-add-btn {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 1px solid var(--panel-border);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.col-add-btn:hover { background: rgba(255, 255, 255, 0.1); color: #fff; }
 
 .column-list {
   display: flex;
@@ -534,8 +552,34 @@ body.tab-private .btn-add {
 }
 .now-row:hover .more-btn,
 .task-row:hover .more-btn,
-.more-btn.menu-open { opacity: 1; }
+.more-btn.menu-open,
+.more-btn.always-visible { opacity: 1; }
 .more-btn:hover { background: rgba(255,255,255,0.08); }
+
+/* ---------- Completed tasks archive ---------- */
+.completed-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 2px 4px 2px 2px;
+}
+.completed-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--row-bg);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+}
+.completed-row .task-title { color: var(--text-secondary); text-decoration: line-through; }
+.restore-btn {
+  flex: none;
+  padding: 6px 14px;
+  font-size: 12.5px;
+}
 
 .row-menu {
   position: absolute;
@@ -620,7 +664,7 @@ body.tab-private .btn-add {
 
 .bucket-picker {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 8px;
 }
 
@@ -656,6 +700,13 @@ body.tab-private .btn-add {
   user-select: none;
 }
 .checkbox-row input { width: 16px; height: 16px; accent-color: #7c5cfc; cursor: pointer; }
+
+.share-link-row {
+  display: flex;
+  gap: 8px;
+}
+.share-link-row .text-input { flex: 1; }
+.share-link-row .btn-primary { flex: none; }
 
 .modal-actions {
   display: flex;

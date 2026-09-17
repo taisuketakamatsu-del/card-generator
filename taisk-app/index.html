@@ -21,8 +21,8 @@
 
       <nav class="tab-bar" id="tabBar">
         <button type="button" class="tab-btn active" data-tab="shared">タスク</button>
+        <button type="button" class="tab-btn" data-tab="completed">完了済み</button>
         <button type="button" class="tab-btn" data-tab="private">プライベート</button>
-        <span class="tab-indicator" id="tabIndicator"></span>
       </nav>
 
       <button class="btn-share" id="shareBtn" title="タスクを共有">
@@ -34,10 +34,6 @@
       </button>
     </div>
   </header>
-
-  <div class="whoami" id="whoami">
-    <button type="button" class="whoami-btn" id="whoamiBtn"></button>
-  </div>
 
   <!-- ---------- Shared board ---------- -->
   <div class="view active" id="sharedView">
@@ -54,6 +50,13 @@
     </section>
   </div>
 
+  <!-- ---------- Completed tasks (kept ~30 days, restorable) ---------- -->
+  <div class="view" id="completedView">
+    <div class="section-title"><span>完了済み</span><span class="badge" id="completedCount">0</span></div>
+    <p class="modal-sub" style="margin:-4px 0 14px;">完了してから30日間、ここに残ります。「復元」でいつでも戻せます。</p>
+    <div class="completed-list" id="completedList"></div>
+  </div>
+
   <!-- ---------- Private board ---------- -->
   <div class="view private-theme" id="privateView">
     <div class="private-locked" id="privateLocked">
@@ -64,7 +67,6 @@
       <p>ここはあなただけのタスク置き場です。パスワードでロックされています。</p>
 
       <input id="privatePasswordInput" class="text-input" type="password" placeholder="パスワード" autocomplete="current-password" />
-      <input id="privatePasswordConfirm" class="text-input" type="password" placeholder="パスワード(確認)" autocomplete="new-password" style="display:none;" />
 
       <button class="btn-primary" id="privateUnlockBtn">ログイン</button>
       <button type="button" class="link-btn" id="privateModeToggle">はじめての方はこちら(登録)</button>
@@ -102,6 +104,22 @@
   </div>
 </div>
 
+<!-- Share link -->
+<div class="modal-overlay" id="shareOverlay">
+  <div class="modal">
+    <h3>このリンクを共有</h3>
+    <p class="modal-sub">同じリンクを開けば、同じタスクをみんなで見られます。</p>
+    <div class="share-link-row">
+      <input id="shareLinkInput" class="text-input" readonly />
+      <button class="btn-primary" id="shareCopyBtn">コピー</button>
+    </div>
+    <div class="modal-actions">
+      <div class="spacer"></div>
+      <button class="btn-ghost" id="shareCloseBtn">閉じる</button>
+    </div>
+  </div>
+</div>
+
 <!-- Add / edit task -->
 <div class="modal-overlay" id="modalOverlay">
   <div class="modal">
@@ -112,7 +130,6 @@
 
     <label class="field-label">期限</label>
     <div class="bucket-picker" id="bucketPicker">
-      <button type="button" class="bucket-opt" data-bucket="today"><span class="dot dot-today"></span>今日</button>
       <button type="button" class="bucket-opt" data-bucket="week"><span class="dot dot-week"></span>今週</button>
       <button type="button" class="bucket-opt" data-bucket="month"><span class="dot dot-month"></span>今月</button>
       <button type="button" class="bucket-opt" data-bucket="later"><span class="dot dot-later"></span>それ以降</button>
