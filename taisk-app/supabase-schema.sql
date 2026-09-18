@@ -8,7 +8,8 @@
 create table if not exists public.tasks (
   id uuid primary key default gen_random_uuid(),
   title text not null,
-  bucket text not null check (bucket in ('week', 'month', 'later')),
+  bucket text not null check (bucket in ('today', 'week', 'month', 'later')),
+  due_date date,
   pinned boolean not null default false,
   priority integer not null default 0,
   done boolean not null default false,
@@ -40,7 +41,8 @@ alter publication supabase_realtime add table public.tasks;
 create table if not exists public.private_tasks (
   id uuid primary key default gen_random_uuid(),
   title text not null,
-  bucket text not null check (bucket in ('week', 'month', 'later')),
+  bucket text not null check (bucket in ('today', 'week', 'month', 'later')),
+  due_date date,
   pinned boolean not null default false,
   priority integer not null default 0,
   done boolean not null default false,

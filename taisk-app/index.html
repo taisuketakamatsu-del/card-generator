@@ -165,8 +165,12 @@
     <textarea id="taskBulkInput" class="text-input" placeholder="1行に1つずつタスク名を貼り付け" rows="6" style="display:none; resize:vertical;"></textarea>
     <button type="button" class="link-btn" id="bulkModeToggle" style="margin-top:6px;">複数行でまとめて追加</button>
 
-    <label class="field-label">期限</label>
+    <label class="field-label">期限日(任意 — 入れると自動で振り分け)</label>
+    <input id="taskDueDateInput" class="text-input" type="date" />
+
+    <label class="field-label">期限(日付がない場合)</label>
     <div class="bucket-picker" id="bucketPicker">
+      <button type="button" class="bucket-opt" data-bucket="today"><span class="dot dot-today"></span>今日</button>
       <button type="button" class="bucket-opt" data-bucket="week"><span class="dot dot-week"></span>今週</button>
       <button type="button" class="bucket-opt" data-bucket="month"><span class="dot dot-month"></span>今月</button>
       <button type="button" class="bucket-opt" data-bucket="later"><span class="dot dot-later"></span>それ以降</button>

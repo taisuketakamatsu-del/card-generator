@@ -1,19 +1,76 @@
 (() => {
   "use strict";
 
-  // "今日" was dropped as its own column — いまやる already covers
-  // today/right-now priorities, so a separate "today" bucket was redundant.
+  // "今日" is back, now driven by real due dates rather than being a
+  // manual duplicate of いまやる: it's "due today", not "high priority".
   const BUCKETS = [
+    { key: "today", label: "今日", dot: "dot-today" },
     { key: "week", label: "今週", dot: "dot-week" },
     { key: "month", label: "今月", dot: "dot-month" },
     { key: "later", label: "それ以降", dot: "dot-later" },
   ];
 
-  // Anything saved under the old "today" bucket (from before this change)
-  // folds into "week" instead of disappearing.
-  function migrateBuckets(list) {
-    list.forEach((t) => { if (t.bucket === "today") t.bucket = "week"; });
-    return list;
+  // ---------------------------------------------------------------------
+  // Due dates: if a task has one, its column is computed from the date
+  // every time it renders (not fixed at creation), so it quietly slides
+  // from 今月 into 今週 as the day approaches. Dragging to a column, or
+  // editing without a date, falls back to the manually-picked bucket.
+  // ---------------------------------------------------------------------
+  const WEEKDAY_JP = ["日", "月", "火", "水", "木", "金", "土"];
+
+  function startOfToday() {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }
+
+  function parseDueDate(dateStr) {
+    if (!dateStr) return null;
+    const d = new Date(`${dateStr}T00:00:00`);
+    return isNaN(d.getTime()) ? null : d;
+  }
+
+  function computeBucketFromDate(dateStr) {
+    const due = parseDueDate(dateStr);
+    if (!due) return null;
+    const today = startOfToday();
+    const weekEnd = new Date(today);
+    weekEnd.setDate(weekEnd.getDate() + 6);
+    const monthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+    if (due <= today) return "today";
+    if (due <= weekEnd) return "week";
+    if (due <= monthEnd) return "month";
+    return "later";
+  }
+
+  function effectiveBucket(task) {
+    return (task.due_date && computeBucketFromDate(task.due_date)) || task.bucket || "week";
+  }
+
+  function formatDueBadge(dateStr) {
+    const due = parseDueDate(dateStr);
+    if (!due) return "";
+    return `${due.getMonth() + 1}/${due.getDate()}(${WEEKDAY_JP[due.getDay()]})`;
+  }
+
+  // Pulls a leading "9/22" or "9/22(火)" off a pasted line (used by bulk
+  // add) and turns it into a real due_date, assuming the nearest such
+  // date that isn't more than ~2 months in the past.
+  function extractLeadingDate(line) {
+    const m = line.match(/^\s*(\d{1,2})\/(\d{1,2})(?:\([月火水木金土日]\))?[\s　:：、]*(.*)$/);
+    if (!m) return { title: line, due_date: null };
+    const month = parseInt(m[1], 10);
+    const day = parseInt(m[2], 10);
+    const rest = m[3].trim();
+    if (!rest || month < 1 || month > 12 || day < 1 || day > 31) return { title: line, due_date: null };
+    const today = startOfToday();
+    let year = today.getFullYear();
+    let candidate = new Date(year, month - 1, day);
+    const twoMonthsAgo = new Date(today);
+    twoMonthsAgo.setMonth(twoMonthsAgo.getMonth() - 2);
+    if (candidate < twoMonthsAgo) candidate = new Date(year + 1, month - 1, day);
+    const iso = `${candidate.getFullYear()}-${String(candidate.getMonth() + 1).padStart(2, "0")}-${String(candidate.getDate()).padStart(2, "0")}`;
+    return { title: rest, due_date: iso };
   }
 
   const CHECK_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
@@ -255,15 +312,27 @@
       title.className = "task-title";
       title.textContent = task.title;
       row.appendChild(title);
+      const dueBadge = makeDueBadge(task);
+      if (dueBadge) row.appendChild(dueBadge);
       row.appendChild(makeMoreBtn(task, actions));
       store.els.nowList.appendChild(row);
     });
   }
 
+  function makeDueBadge(task) {
+    if (!task.due_date) return null;
+    const badge = document.createElement("span");
+    badge.className = "due-badge";
+    badge.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="16" y1="2" x2="16" y2="6"/></svg><span>${formatDueBadge(task.due_date)}</span>`;
+    return badge;
+  }
+
   function renderBoard(store) {
     store.els.board.innerHTML = "";
     BUCKETS.forEach((bucketDef) => {
-      const items = store.tasks.filter((t) => t.bucket === bucketDef.key && !t.done);
+      // Pinned tasks live only in いまやる — no duplicate showing in the
+      // board too once they've been pulled into the spotlight.
+      const items = store.tasks.filter((t) => effectiveBucket(t) === bucketDef.key && !t.done && !t.pinned);
 
       const col = document.createElement("div");
       col.className = "column";
@@ -316,6 +385,8 @@
         title.className = "task-title";
         title.textContent = task.title;
         row.appendChild(title);
+        const dueBadge = makeDueBadge(task);
+        if (dueBadge) row.appendChild(dueBadge);
         row.appendChild(makeMoreBtn(task, actions));
         list.appendChild(row);
       });
@@ -329,7 +400,13 @@
         col.classList.remove("drag-over");
         const id = e.dataTransfer.getData("text/plain");
         const task = store.tasks.find((t) => t.id === id);
-        if (task && task.bucket !== bucketDef.key) store.updateTask(id, { bucket: bucketDef.key });
+        // A manual drag always wins: dropping it here fixes the bucket
+        // explicitly, clears the date-driven auto-sort, and — if it came
+        // from いまやる — unpins it so it actually shows up here instead
+        // of staying in the spotlight only.
+        if (task && (effectiveBucket(task) !== bucketDef.key || task.pinned)) {
+          store.updateTask(id, { bucket: bucketDef.key, due_date: null, pinned: false });
+        }
       });
 
       store.els.board.appendChild(col);
@@ -394,8 +471,8 @@
   // ---------------------------------------------------------------------
   function createSeedTasks() {
     return [
-      { id: uid(), title: "資料を提出する", bucket: "week", pinned: true, done: false, priority: 1, owner_name: currentNickname },
-      { id: uid(), title: "メールを返信する", bucket: "week", pinned: false, done: false, priority: 0, owner_name: currentNickname },
+      { id: uid(), title: "資料を提出する", bucket: "today", pinned: true, done: false, priority: 1, owner_name: currentNickname },
+      { id: uid(), title: "メールを返信する", bucket: "today", pinned: false, done: false, priority: 0, owner_name: currentNickname },
       { id: uid(), title: "会議の準備をする", bucket: "week", pinned: false, done: false, priority: 0, owner_name: currentNickname },
       { id: uid(), title: "経費精算をする", bucket: "week", pinned: false, done: false, priority: 0, owner_name: currentNickname },
       { id: uid(), title: "プロジェクト計画を見直す", bucket: "month", pinned: true, done: false, priority: 2, owner_name: currentNickname },
@@ -445,7 +522,7 @@
     async function fetchRemote(client) {
       const { data, error } = await client.from(table).select("*").order("created_at", { ascending: true });
       if (error) { console.error(error); showToast("読み込みに失敗しました"); return; }
-      store.tasks = migrateBuckets(data);
+      store.tasks = data;
     }
 
     function persistLocal() { saveLocal(localKey, store.tasks); }
@@ -475,7 +552,7 @@
           })
           .subscribe();
       } else {
-        store.tasks = migrateBuckets(loadLocal(localKey, seedFn));
+        store.tasks = loadLocal(localKey, seedFn);
       }
       await store.purgeOldCompleted();
       store.render();
@@ -485,17 +562,17 @@
       if (store.channel) { sb.removeChannel(store.channel); store.channel = null; }
     };
 
-    store.addTask = async function ({ title, bucket, pinned }) {
+    store.addTask = async function ({ title, bucket, pinned, due_date }) {
       const priority = pinned ? Date.now() : 0;
       if (store.authClient) {
-        const row = { title, bucket, pinned, done: false, priority };
+        const row = { title, bucket, pinned, due_date: due_date || null, done: false, priority };
         if (mode === "shared") row.owner_name = currentNickname;
         if (mode === "private") row.owner_id = (await store.authClient.auth.getUser()).data.user.id;
         const { error } = await store.authClient.from(table).insert(row);
         if (error) { console.error(error); showToast("追加に失敗しました"); }
         // realtime subscription will refresh + render
       } else {
-        store.tasks.push({ id: uid(), title, bucket, pinned, done: false, priority, owner_name: currentNickname });
+        store.tasks.push({ id: uid(), title, bucket, pinned, due_date: due_date || null, done: false, priority, owner_name: currentNickname });
         persistLocal();
         store.render();
       }
@@ -594,6 +671,7 @@
   const taskTitleInput = document.getElementById("taskTitleInput");
   const taskBulkInput = document.getElementById("taskBulkInput");
   const bulkModeToggle = document.getElementById("bulkModeToggle");
+  const taskDueDateInput = document.getElementById("taskDueDateInput");
   const bucketPicker = document.getElementById("bucketPicker");
   const pinCheckbox = document.getElementById("pinCheckbox");
   const saveBtn = document.getElementById("saveBtn");
@@ -626,6 +704,13 @@
     btn.addEventListener("click", () => setSelectedBucket(activeStore, btn.dataset.bucket));
   });
 
+  // Picking a date previews which bucket it'll actually land in, since
+  // the date (when present) always wins over the manual bucket choice.
+  taskDueDateInput.addEventListener("change", () => {
+    const computed = computeBucketFromDate(taskDueDateInput.value);
+    if (computed) setSelectedBucket(activeStore, computed);
+  });
+
   function openTaskModal(store, id, presetBucket) {
     activeStore = store;
     modalEditingId = id || null;
@@ -636,17 +721,19 @@
       if (!task) return;
       modalTitle.textContent = "タスクを編集";
       taskTitleInput.value = task.title;
+      taskDueDateInput.value = task.due_date || "";
       pinCheckbox.checked = !!task.pinned;
       deleteBtn.style.display = "inline-block";
       saveBtn.textContent = "保存";
-      setSelectedBucket(store, task.bucket);
+      setSelectedBucket(store, effectiveBucket(task));
     } else {
       modalTitle.textContent = "新しいタスク";
       taskTitleInput.value = "";
+      taskDueDateInput.value = "";
       pinCheckbox.checked = false;
       deleteBtn.style.display = "none";
       saveBtn.textContent = "追加";
-      setSelectedBucket(store, presetBucket || "week");
+      setSelectedBucket(store, presetBucket || "today");
     }
     modalOverlay.classList.add("open");
     setTimeout(() => taskTitleInput.focus(), 30);
@@ -661,8 +748,17 @@
     if (bulkMode && !modalEditingId) {
       const lines = taskBulkInput.value.split("\n").map((l) => l.trim()).filter(Boolean);
       if (!lines.length) { taskBulkInput.focus(); return; }
-      lines.forEach((title) => {
-        activeStore.addTask({ title, bucket: activeStore.selectedBucket, pinned: pinCheckbox.checked });
+      // Each line may start with its own "9/22" or "9/22(火)" date — when
+      // present, it decides the bucket; lines without one fall back to
+      // whatever bucket is currently selected in the picker.
+      lines.forEach((line) => {
+        const { title, due_date } = extractLeadingDate(line);
+        activeStore.addTask({
+          title,
+          bucket: due_date ? computeBucketFromDate(due_date) : activeStore.selectedBucket,
+          due_date,
+          pinned: pinCheckbox.checked,
+        });
       });
       showToast(`${lines.length}件のタスクを追加しました`);
       closeTaskModal();
@@ -670,7 +766,13 @@
     }
     const title = taskTitleInput.value.trim();
     if (!title) { taskTitleInput.focus(); return; }
-    const payload = { title, bucket: activeStore.selectedBucket, pinned: pinCheckbox.checked };
+    const due_date = taskDueDateInput.value || null;
+    const payload = {
+      title,
+      bucket: due_date ? computeBucketFromDate(due_date) : activeStore.selectedBucket,
+      due_date,
+      pinned: pinCheckbox.checked,
+    };
     if (modalEditingId) {
       activeStore.updateTask(modalEditingId, payload);
     } else {
