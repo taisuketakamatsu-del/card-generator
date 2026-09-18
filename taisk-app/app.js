@@ -183,11 +183,88 @@
     document.querySelectorAll(".row-menu").forEach((m) => m.remove());
     document.querySelectorAll(".more-btn.menu-open").forEach((b) => b.classList.remove("menu-open"));
   }
+
+  // Ctrl/Cmd+click multi-select, used to drag a batch of tasks between
+  // columns or into いまやる at once (see the dragstart/drop handlers below).
+  const selectedIds = new Set();
+  function toggleSelect(id, row) {
+    if (selectedIds.has(id)) { selectedIds.delete(id); row.classList.remove("selected"); }
+    else { selectedIds.add(id); row.classList.add("selected"); }
+  }
+  function clearSelection() {
+    if (!selectedIds.size) return;
+    selectedIds.clear();
+    document.querySelectorAll(".task-row.selected, .now-row.selected").forEach((el) => el.classList.remove("selected"));
+  }
+  function selectSameDueDate(store, task) {
+    if (!task.due_date) return;
+    selectedIds.clear();
+    const matches = store.tasks.filter((t) => t.due_date === task.due_date && !t.done && matchesSearch(t));
+    matches.forEach((t) => selectedIds.add(t.id));
+    document.querySelectorAll(".task-row[data-id], .now-row[data-id]").forEach((el) => {
+      el.classList.toggle("selected", selectedIds.has(el.dataset.id));
+    });
+    showToast(`同じ日付のタスクを${matches.length}件選択しました`);
+  }
+  // A drag can carry either one task id (plain string) or, when the
+  // dragged row is part of a multi-selection, a JSON array of ids.
+  function getDragIds(e) {
+    const raw = e.dataTransfer.getData("text/plain");
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed;
+    } catch (err) { /* plain single id, not JSON */ }
+    return [raw];
+  }
+
   document.addEventListener("click", (e) => {
     if (!e.target.closest(".more-btn") && !e.target.closest(".row-menu")) closeMenus();
+    if (!e.target.closest(".task-row") && !e.target.closest(".now-row")) clearSelection();
   });
   document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") closeMenus();
+    if (e.key === "Escape") { closeMenus(); clearSelection(); }
+  });
+
+  // ---------------------------------------------------------------------
+  // Undo (Cmd/Ctrl+Z) — a small global stack of add/update/delete entries,
+  // captured inside makeStore's mutators below. Local-storage mode only:
+  // remote (Supabase) mutations aren't tracked here, since this app isn't
+  // running with Supabase configured yet.
+  // ---------------------------------------------------------------------
+  const undoStack = [];
+  const UNDO_LIMIT = 30;
+  function pushUndo(entry) {
+    undoStack.push(entry);
+    if (undoStack.length > UNDO_LIMIT) undoStack.shift();
+  }
+  // Reverts a specific entry (removing it from the stack wherever it sits,
+  // not necessarily the tail) so the delete-toast's own "元に戻す" button
+  // stays correct even if other edits happened in the meantime.
+  function applyUndo(entry) {
+    if (!entry) { showToast("元に戻せる操作がありません"); return; }
+    const i = undoStack.indexOf(entry);
+    if (i !== -1) undoStack.splice(i, 1);
+    const { store } = entry;
+    if (entry.type === "delete") {
+      store.tasks.splice(Math.min(entry.index, store.tasks.length), 0, entry.task);
+    } else if (entry.type === "update") {
+      const t = store.tasks.find((x) => x.id === entry.id);
+      if (t) Object.assign(t, entry.prev);
+    } else if (entry.type === "add") {
+      store.tasks = store.tasks.filter((x) => x.id !== entry.id);
+    }
+    store.persist();
+    store.render();
+    showToast(entry.type === "delete" ? "削除を元に戻しました" : entry.type === "add" ? "追加を元に戻しました" : "変更を元に戻しました");
+  }
+  function popUndo() { applyUndo(undoStack[undoStack.length - 1]); }
+
+  document.addEventListener("keydown", (e) => {
+    if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== "z" || e.shiftKey) return;
+    const tag = (e.target.tagName || "").toLowerCase();
+    if (tag === "input" || tag === "textarea") return; // let native text-field undo work
+    e.preventDefault();
+    popUndo();
   });
 
   // Purely visual now — the whole row is the tap target (see
@@ -207,6 +284,11 @@
     let pendingTimer = null;
     row.addEventListener("click", (e) => {
       if (e.target.closest(".more-btn") || e.target.closest(".row-menu")) return;
+      if (e.metaKey || e.ctrlKey) {
+        e.preventDefault();
+        toggleSelect(task.id, row);
+        return;
+      }
       if (pendingTimer) {
         clearTimeout(pendingTimer);
         pendingTimer = null;
@@ -221,6 +303,37 @@
     });
   }
 
+  // A native <input type="date"> used as a one-shot, invisible picker —
+  // opened right where the triggering button was, so changing a due date
+  // never needs the full edit modal.
+  function openInlineDatePicker(x, y, initialValue, onPick) {
+    const input = document.createElement("input");
+    input.type = "date";
+    input.className = "inline-date-picker";
+    input.value = initialValue || "";
+    input.style.position = "fixed";
+    input.style.left = `${Math.min(Math.max(x, 0), window.innerWidth - 20)}px`;
+    input.style.top = `${Math.min(Math.max(y, 0), window.innerHeight - 20)}px`;
+    input.style.opacity = "0";
+    input.style.width = "1px";
+    input.style.height = "1px";
+    input.style.pointerEvents = "none";
+    input.style.zIndex = "60";
+    document.body.appendChild(input);
+    let done = false;
+    const cleanup = () => { if (!done) { done = true; input.remove(); } };
+    input.addEventListener("change", () => { onPick(input.value || null); cleanup(); });
+    input.addEventListener("blur", () => setTimeout(cleanup, 200));
+    if (typeof input.showPicker === "function") {
+      try { input.showPicker(); return; } catch (err) { /* fall through to visible fallback */ }
+    }
+    input.style.opacity = "1";
+    input.style.width = "140px";
+    input.style.height = "32px";
+    input.style.pointerEvents = "auto";
+    input.focus();
+  }
+
   function buildMenu(task, actions) {
     const menu = document.createElement("div");
     menu.className = "row-menu";
@@ -228,19 +341,36 @@
     const editBtn = document.createElement("button");
     editBtn.textContent = "編集";
     editBtn.addEventListener("click", (e2) => { e2.stopPropagation(); closeMenus(); actions.onEdit(); });
+    menu.appendChild(editBtn);
+
+    const dateBtn = document.createElement("button");
+    dateBtn.textContent = "期限を変更";
+    dateBtn.addEventListener("click", (e2) => {
+      e2.stopPropagation();
+      const rect = dateBtn.getBoundingClientRect();
+      closeMenus();
+      openInlineDatePicker(rect.left, rect.bottom, task.due_date, (newDate) => actions.onChangeDate(newDate));
+    });
+    menu.appendChild(dateBtn);
+
+    if (task.due_date) {
+      const selectSameBtn = document.createElement("button");
+      selectSameBtn.textContent = "同じ日付を選択";
+      selectSameBtn.addEventListener("click", (e2) => { e2.stopPropagation(); closeMenus(); actions.onSelectSameDate(); });
+      menu.appendChild(selectSameBtn);
+    }
 
     const pinBtn = document.createElement("button");
     pinBtn.textContent = task.pinned ? "いまやるから外す" : "いまやるに追加";
     pinBtn.addEventListener("click", (e2) => { e2.stopPropagation(); closeMenus(); actions.onTogglePin(); });
+    menu.appendChild(pinBtn);
 
     const delBtn = document.createElement("button");
     delBtn.textContent = "削除";
     delBtn.className = "danger";
     delBtn.addEventListener("click", (e2) => { e2.stopPropagation(); closeMenus(); actions.onDelete(); });
-
-    menu.appendChild(editBtn);
-    menu.appendChild(pinBtn);
     menu.appendChild(delBtn);
+
     return menu;
   }
 
@@ -274,7 +404,7 @@
       const menu = buildMenu(task, actions);
       menu.style.position = "fixed";
       menu.style.left = `${Math.min(e.clientX, window.innerWidth - 180)}px`;
-      menu.style.top = `${Math.min(e.clientY, window.innerHeight - 140)}px`;
+      menu.style.top = `${Math.min(e.clientY, window.innerHeight - 210)}px`;
       menu.style.right = "auto";
       document.body.appendChild(menu);
     });
@@ -309,25 +439,23 @@
 
       const row = document.createElement("div");
       row.className = "now-row" + (i === 0 ? " rank-1" : "") + (isOverflow ? " overflow" : "");
+      if (selectedIds.has(task.id)) row.classList.add("selected");
       row.dataset.id = task.id;
       row.draggable = true;
       // Priority is shown by both color intensity AND size — rank 1 is the
       // biggest, brightest row; each rank after that steps down on both.
-      // A tiny alternating tilt gives いまやる a looser, floating feel
-      // against the strictly-ordered board below.
       if (!isOverflow) {
         const opacity = Math.max(1 - i * 0.3, 0.28);
         const scale = Math.max(1 - i * 0.09, 0.78);
-        const tilt = i === 0 ? 0 : (i % 2 === 0 ? -1 : 1) * (0.6 + i * 0.25);
         row.style.setProperty("--rank-opacity", opacity.toFixed(2));
         row.style.setProperty("--rank-scale", scale.toFixed(2));
-        row.style.setProperty("--rank-tilt", `${tilt.toFixed(2)}deg`);
       }
-      row.title = `優先度 ${i + 1}(ドラッグで並び替え・右クリックで編集/削除)`;
+      row.title = `優先度 ${i + 1}(ドラッグで並び替え・右クリックで編集/削除・Cmd/Ctrl+クリックで複数選択)`;
 
       row.addEventListener("dragstart", (e) => {
         row.classList.add("dragging");
-        e.dataTransfer.setData("text/plain", task.id);
+        const ids = selectedIds.has(task.id) && selectedIds.size > 1 ? Array.from(selectedIds) : [task.id];
+        e.dataTransfer.setData("text/plain", ids.length > 1 ? JSON.stringify(ids) : task.id);
         e.dataTransfer.effectAllowed = "move";
       });
       row.addEventListener("dragend", () => row.classList.remove("dragging"));
@@ -337,6 +465,8 @@
         onEdit: () => store.openEdit(task.id),
         onTogglePin: () => store.togglePin(task.id),
         onDelete: () => store.deleteTask(task.id),
+        onChangeDate: (newDate) => { store.updateTask(task.id, { due_date: newDate }); showToast(newDate ? "期限を変更しました" : "期限を削除しました"); },
+        onSelectSameDate: () => selectSameDueDate(store, task),
       };
       attachContextMenu(row, task, actions);
 
@@ -395,12 +525,15 @@
       items.forEach((task) => {
         const row = document.createElement("div");
         row.className = "task-row";
+        if (selectedIds.has(task.id)) row.classList.add("selected");
         row.draggable = true;
         row.dataset.id = task.id;
+        row.title = "ドラッグで移動・右クリックで編集/削除・Cmd/Ctrl+クリックで複数選択";
 
         row.addEventListener("dragstart", (e) => {
           row.classList.add("dragging");
-          e.dataTransfer.setData("text/plain", task.id);
+          const ids = selectedIds.has(task.id) && selectedIds.size > 1 ? Array.from(selectedIds) : [task.id];
+          e.dataTransfer.setData("text/plain", ids.length > 1 ? JSON.stringify(ids) : task.id);
           e.dataTransfer.effectAllowed = "move";
         });
         row.addEventListener("dragend", () => row.classList.remove("dragging"));
@@ -410,6 +543,8 @@
           onEdit: () => store.openEdit(task.id),
           onTogglePin: () => store.togglePin(task.id),
           onDelete: () => store.deleteTask(task.id),
+          onChangeDate: (newDate) => { store.updateTask(task.id, { due_date: newDate }); showToast(newDate ? "期限を変更しました" : "期限を削除しました"); },
+          onSelectSameDate: () => selectSameDueDate(store, task),
         };
         attachContextMenu(row, task, actions);
 
@@ -431,15 +566,18 @@
       col.addEventListener("drop", (e) => {
         e.preventDefault();
         col.classList.remove("drag-over");
-        const id = e.dataTransfer.getData("text/plain");
-        const task = store.tasks.find((t) => t.id === id);
+        const ids = getDragIds(e);
         // A manual drag always wins: dropping it here fixes the bucket
         // explicitly, clears the date-driven auto-sort, and — if it came
         // from いまやる — unpins it so it actually shows up here instead
         // of staying in the spotlight only.
-        if (task && (effectiveBucket(task) !== bucketDef.key || task.pinned)) {
-          store.updateTask(id, { bucket: bucketDef.key, due_date: null, pinned: false });
-        }
+        ids.forEach((id) => {
+          const task = store.tasks.find((t) => t.id === id);
+          if (task && (effectiveBucket(task) !== bucketDef.key || task.pinned)) {
+            store.updateTask(id, { bucket: bucketDef.key, due_date: null, pinned: false });
+          }
+        });
+        if (ids.length > 1) clearSelection();
       });
 
       store.els.board.appendChild(col);
@@ -483,7 +621,21 @@
     listEl.addEventListener("drop", (e) => {
       e.preventDefault();
       listEl.classList.remove("drag-over-now");
-      const id = e.dataTransfer.getData("text/plain");
+      const ids = getDragIds(e);
+      if (ids.length > 1) {
+        // Multi-select drop: pin everything that isn't already pinned, in
+        // selection order. Reordering several already-pinned rows at once
+        // isn't supported — that still falls through to the single-id path.
+        const maxPriority = Math.max(0, ...store.tasks.filter((t) => t.pinned).map((t) => t.priority || 0));
+        let offset = 1;
+        ids.forEach((id) => {
+          const task = store.tasks.find((t) => t.id === id);
+          if (task && !task.pinned) { store.updateTask(id, { pinned: true, priority: maxPriority + offset }); offset++; }
+        });
+        clearSelection();
+        return;
+      }
+      const id = ids[0];
       const task = store.tasks.find((t) => t.id === id);
       if (!task) return;
       if (!task.pinned) {
@@ -559,6 +711,7 @@
     }
 
     function persistLocal() { saveLocal(localKey, store.tasks); }
+    store.persist = persistLocal;
 
     store.purgeOldCompleted = async function () {
       const cutoff = Date.now() - THIRTY_DAYS_MS;
@@ -605,9 +758,11 @@
         if (error) { console.error(error); showToast("追加に失敗しました"); }
         // realtime subscription will refresh + render
       } else {
-        store.tasks.push({ id: uid(), title, bucket, pinned, due_date: due_date || null, done: false, priority, owner_name: currentNickname });
+        const task = { id: uid(), title, bucket, pinned, due_date: due_date || null, done: false, priority, owner_name: currentNickname };
+        store.tasks.push(task);
         persistLocal();
         store.render();
+        pushUndo({ type: "add", store, id: task.id });
       }
     };
 
@@ -618,7 +773,12 @@
         if (error) { console.error(error); showToast("更新に失敗しました"); }
       } else {
         const t = store.tasks.find((x) => x.id === id);
-        if (t) Object.assign(t, patch);
+        if (t) {
+          const prev = {};
+          Object.keys(patch).forEach((k) => { prev[k] = t[k]; });
+          Object.assign(t, patch);
+          pushUndo({ type: "update", store, id, prev });
+        }
         persistLocal();
         store.render();
       }
@@ -651,11 +811,9 @@
         store.tasks.splice(idx, 1);
         persistLocal();
         store.render();
-        showToast("タスクを削除しました", "元に戻す", () => {
-          store.tasks.splice(Math.min(idx, store.tasks.length), 0, removed);
-          persistLocal();
-          store.render();
-        });
+        const entry = { type: "delete", store, task: removed, index: idx };
+        pushUndo(entry);
+        showToast("タスクを削除しました", "元に戻す", () => applyUndo(entry));
       }
     };
 
@@ -865,6 +1023,47 @@
     sharedStore.render();
     privateStore.render();
   });
+
+  // ---------------------------------------------------------------------
+  // Sidebar collapse
+  // ---------------------------------------------------------------------
+  const appShell = document.querySelector(".app-shell");
+  const sidebarCollapseBtn = document.getElementById("sidebarCollapseBtn");
+  const sidebarExpandBtn = document.getElementById("sidebarExpandBtn");
+  const SIDEBAR_COLLAPSED_KEY = "taisk.sidebarCollapsed";
+
+  function setSidebarCollapsed(collapsed) {
+    appShell.classList.toggle("sidebar-collapsed", collapsed);
+    sidebarExpandBtn.style.display = collapsed ? "" : "none";
+    localStorage.setItem(SIDEBAR_COLLAPSED_KEY, collapsed ? "1" : "0");
+  }
+  setSidebarCollapsed(localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "1");
+  sidebarCollapseBtn.addEventListener("click", () => setSidebarCollapsed(true));
+  sidebarExpandBtn.addEventListener("click", () => setSidebarCollapsed(false));
+
+  // ---------------------------------------------------------------------
+  // Today's date (topbar) — also drives the once-a-minute check that
+  // re-renders the board when the date rolls over past midnight, so due-date
+  // buckets (今日/今週/...) stay correct without needing a page reload.
+  // ---------------------------------------------------------------------
+  const todayDateLabel = document.getElementById("todayDateLabel");
+  let lastKnownDay = startOfToday().getTime();
+
+  function renderTodayDate() {
+    const d = new Date();
+    todayDateLabel.textContent = `${d.getMonth() + 1}月${d.getDate()}日(${WEEKDAY_JP[d.getDay()]})`;
+  }
+  renderTodayDate();
+
+  setInterval(() => {
+    const today = startOfToday().getTime();
+    if (today !== lastKnownDay) {
+      lastKnownDay = today;
+      renderTodayDate();
+      sharedStore.render();
+      privateStore.render();
+    }
+  }, 60000);
 
   // ---------------------------------------------------------------------
   // Nickname registration

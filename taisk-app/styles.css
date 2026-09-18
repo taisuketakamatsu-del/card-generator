@@ -110,6 +110,44 @@ body.tab-private {
   .sidebar { display: none; }
 }
 
+.sidebar-collapse-btn {
+  flex: none;
+  margin-left: auto;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 1px solid var(--panel-border);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+.sidebar-collapse-btn:hover { color: #fff; background: rgba(255, 255, 255, 0.08); }
+
+.app-shell.sidebar-collapsed .sidebar { display: none; }
+.sidebar-expand-btn {
+  position: fixed;
+  top: 24px;
+  left: 16px;
+  z-index: 30;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1px solid var(--panel-border);
+  background: rgba(20, 22, 34, 0.85);
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  backdrop-filter: var(--glass-blur);
+  transition: color 0.15s ease, background 0.15s ease;
+}
+.sidebar-expand-btn:hover { color: #fff; background: rgba(255, 255, 255, 0.1); }
+
 /* The whole app fits one viewport: header/whoami are fixed-height, the
    active view (now-list + board) fills the rest and scrolls internally
    per-section instead of the page scrolling. */
@@ -169,6 +207,15 @@ body.tab-private {
   outline: none;
 }
 .search-input:focus { border-color: #7c5cfc; }
+
+.today-date {
+  flex: none;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
 
 /* ---------- Members ---------- */
 .members-list {
@@ -567,7 +614,6 @@ body.tab-private .btn-add {
   border-radius: var(--radius-lg);
   padding: calc(14px * var(--rank-scale, 1)) calc(20px * var(--rank-scale, 1));
   flex: none;
-  transform: rotate(var(--rank-tilt, 0deg));
   backdrop-filter: var(--glass-blur);
   -webkit-backdrop-filter: var(--glass-blur);
   box-shadow:
@@ -621,6 +667,10 @@ body.tab-private .btn-add {
 .now-row.dragging { opacity: 0.4; }
 .now-row.done { opacity: 0.35; }
 .now-row.done .task-title { text-decoration: line-through; }
+.now-row.selected {
+  border-color: #7c5cfc;
+  box-shadow: 0 0 0 1px rgba(124, 92, 252, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.22);
+}
 
 /* Pinned tasks beyond the top 3 spill into a compact "最近" group instead
    of growing the spotlight list without bound. */
@@ -774,6 +824,11 @@ body.tab-private .btn-add {
 }
 .task-row:hover { background: var(--row-bg-hover); border-color: var(--panel-border); }
 .task-row.dragging { opacity: 0.4; }
+.task-row.selected {
+  border-color: #7c5cfc;
+  background: rgba(124, 92, 252, 0.14);
+  box-shadow: 0 0 0 1px rgba(124, 92, 252, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.18);
+}
 
 .task-row.done .task-title { text-decoration: line-through; color: var(--text-muted); }
 

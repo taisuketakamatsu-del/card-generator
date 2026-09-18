@@ -13,7 +13,7 @@
 <body>
 <div class="app-shell">
 
-  <aside class="sidebar">
+  <aside class="sidebar" id="sidebar">
     <div class="logo">
       <svg class="logo-mark" width="26" height="26" viewBox="0 0 32 32" fill="none">
         <defs>
@@ -26,6 +26,9 @@
         <rect x="3" y="14" width="13" height="16" rx="4.5" transform="rotate(20 3 14)" fill="url(#logoGrad)" opacity="0.88"/>
       </svg>
       <span>t&thinsp;a&thinsp;i&thinsp;s&thinsp;k</span>
+      <button type="button" class="sidebar-collapse-btn" id="sidebarCollapseBtn" title="サイドバーを閉じる">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+      </button>
     </div>
 
     <nav class="tab-bar" id="tabBar">
@@ -40,10 +43,15 @@
     </div>
   </aside>
 
+  <button type="button" class="sidebar-expand-btn" id="sidebarExpandBtn" title="サイドバーを開く" style="display:none;">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+  </button>
+
   <div class="app">
 
   <header class="topbar">
     <div class="search-wrap">
+      <span class="today-date" id="todayDateLabel"></span>
       <button type="button" class="icon-btn" id="searchToggleBtn" title="検索">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
       </button>
