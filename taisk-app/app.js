@@ -47,10 +47,32 @@
     return (task.due_date && computeBucketFromDate(task.due_date)) || task.bucket || "week";
   }
 
+  function dueDiffDays(dateStr) {
+    const due = parseDueDate(dateStr);
+    if (!due) return null;
+    return Math.round((due - startOfToday()) / 86400000);
+  }
+
   function formatDueBadge(dateStr) {
     const due = parseDueDate(dateStr);
     if (!due) return "";
+    const diff = dueDiffDays(dateStr);
+    if (diff === 0) return "今日";
+    if (diff === 1) return "明日";
+    if (diff === -1) return "昨日";
+    if (diff > 1 && diff <= 6) return `${WEEKDAY_JP[due.getDay()]}曜日`;
     return `${due.getMonth() + 1}/${due.getDate()}(${WEEKDAY_JP[due.getDay()]})`;
+  }
+
+  function dueUrgencyClass(dateStr) {
+    const due = parseDueDate(dateStr);
+    if (!due) return "due-later";
+    const diff = dueDiffDays(dateStr);
+    if (diff < 0) return "due-overdue";
+    if (diff === 0) return "due-today";
+    if (diff <= 6) return "due-week";
+    const monthEnd = new Date(startOfToday().getFullYear(), startOfToday().getMonth() + 1, 0);
+    return due <= monthEnd ? "due-month" : "due-later";
   }
 
   // Pulls a leading "9/22" or "9/22(火)" off a pasted line (used by bulk
@@ -107,6 +129,13 @@
   function getNickname() { return (localStorage.getItem(NICK_KEY) || "").trim(); }
   function setNickname(n) { localStorage.setItem(NICK_KEY, n.trim()); }
   let currentNickname = getNickname();
+
+  // Live title-substring filter applied across いまやる + board while the
+  // search box is open; empty string means "show everything".
+  let searchQuery = "";
+  function matchesSearch(task) {
+    return !searchQuery || task.title.toLowerCase().includes(searchQuery);
+  }
 
   const AVATAR_COLORS = ["#f43f5e", "#f97316", "#eab308", "#22c55e", "#06b6d4", "#3b82f6", "#8b5cf6", "#ec4899"];
   function colorForName(name) {
@@ -252,14 +281,14 @@
   }
 
   function renderNowList(store) {
-    const pinned = store.tasks.filter((t) => t.pinned && !t.done).sort((a, b) => (a.priority || 0) - (b.priority || 0));
+    const pinned = store.tasks.filter((t) => t.pinned && !t.done && matchesSearch(t)).sort((a, b) => (a.priority || 0) - (b.priority || 0));
     store.els.nowCount.textContent = pinned.length;
     store.els.nowList.innerHTML = "";
 
     if (pinned.length === 0) {
       const empty = document.createElement("div");
-      empty.className = "column-empty";
-      empty.textContent = "いまやるタスクはありません。タスクの「⋯」から追加できます。";
+      empty.className = "now-empty-frame";
+      empty.textContent = searchQuery ? "一致するタスクはありません。" : "いまやるタスクはありません。タスクの「⋯」から追加できます。";
       store.els.nowList.appendChild(empty);
       return;
     }
@@ -284,11 +313,15 @@
       row.draggable = true;
       // Priority is shown by both color intensity AND size — rank 1 is the
       // biggest, brightest row; each rank after that steps down on both.
+      // A tiny alternating tilt gives いまやる a looser, floating feel
+      // against the strictly-ordered board below.
       if (!isOverflow) {
         const opacity = Math.max(1 - i * 0.3, 0.28);
         const scale = Math.max(1 - i * 0.09, 0.78);
+        const tilt = i === 0 ? 0 : (i % 2 === 0 ? -1 : 1) * (0.6 + i * 0.25);
         row.style.setProperty("--rank-opacity", opacity.toFixed(2));
         row.style.setProperty("--rank-scale", scale.toFixed(2));
+        row.style.setProperty("--rank-tilt", `${tilt.toFixed(2)}deg`);
       }
       row.title = `優先度 ${i + 1}(ドラッグで並び替え・右クリックで編集/削除)`;
 
@@ -322,7 +355,7 @@
   function makeDueBadge(task) {
     if (!task.due_date) return null;
     const badge = document.createElement("span");
-    badge.className = "due-badge";
+    badge.className = `due-badge ${dueUrgencyClass(task.due_date)}`;
     badge.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="16" y1="2" x2="16" y2="6"/></svg><span>${formatDueBadge(task.due_date)}</span>`;
     return badge;
   }
@@ -332,7 +365,7 @@
     BUCKETS.forEach((bucketDef) => {
       // Pinned tasks live only in いまやる — no duplicate showing in the
       // board too once they've been pulled into the spotlight.
-      const items = store.tasks.filter((t) => effectiveBucket(t) === bucketDef.key && !t.done && !t.pinned);
+      const items = store.tasks.filter((t) => effectiveBucket(t) === bucketDef.key && !t.done && !t.pinned && matchesSearch(t));
 
       const col = document.createElement("div");
       col.className = "column";
@@ -355,7 +388,7 @@
       if (items.length === 0) {
         const empty = document.createElement("div");
         empty.className = "column-empty";
-        empty.textContent = "タスクなし";
+        empty.textContent = searchQuery ? "一致なし" : "タスクなし";
         list.appendChild(empty);
       }
 
@@ -678,7 +711,6 @@
   const cancelBtn = document.getElementById("cancelBtn");
   const deleteBtn = document.getElementById("deleteBtn");
   const addBtn = document.getElementById("addBtn");
-  const shareBtn = document.getElementById("shareBtn");
 
   let activeStore = sharedStore;
   let modalEditingId = null;
@@ -795,7 +827,6 @@
   document.addEventListener("keydown", (e) => {
     if (e.key !== "Escape") return;
     if (modalOverlay.classList.contains("open")) closeTaskModal();
-    if (shareOverlay.classList.contains("open")) closeShareModal();
   });
 
   addBtn.addEventListener("click", () => {
@@ -806,29 +837,33 @@
     openTaskModal(currentTab === "private" ? privateStore : sharedStore, null);
   });
 
-  // ---------------------------------------------------------------------
-  // Share: show the link to this board (same URL = same shared tasks
-  // once Supabase is configured; in local-only mode it just shares this
-  // page, useful once it's hosted somewhere).
-  // ---------------------------------------------------------------------
-  const shareOverlay = document.getElementById("shareOverlay");
-  const shareLinkInput = document.getElementById("shareLinkInput");
-  const shareCopyBtn = document.getElementById("shareCopyBtn");
-  const shareCloseBtn = document.getElementById("shareCloseBtn");
-
-  function openShareModal() {
-    shareLinkInput.value = window.location.href.split("#")[0];
-    shareOverlay.classList.add("open");
-    setTimeout(() => shareLinkInput.select(), 30);
-  }
-  function closeShareModal() { shareOverlay.classList.remove("open"); }
-
-  shareBtn.addEventListener("click", openShareModal);
-  shareCloseBtn.addEventListener("click", closeShareModal);
-  shareOverlay.addEventListener("click", (e) => { if (e.target === shareOverlay) closeShareModal(); });
-  shareCopyBtn.addEventListener("click", async () => {
-    try { await navigator.clipboard.writeText(shareLinkInput.value); showToast("リンクをコピーしました"); }
-    catch (e) { shareLinkInput.select(); showToast("選択したので Cmd/Ctrl+C でコピーしてください"); }
+  const searchToggleBtn = document.getElementById("searchToggleBtn");
+  const searchInput = document.getElementById("searchInput");
+  searchToggleBtn.addEventListener("click", () => {
+    const isOpen = searchInput.style.display !== "none";
+    if (isOpen) {
+      searchInput.style.display = "none";
+      searchInput.value = "";
+      searchQuery = "";
+      sharedStore.render();
+      privateStore.render();
+    } else {
+      searchInput.style.display = "";
+      searchInput.focus();
+    }
+  });
+  searchInput.addEventListener("input", () => {
+    searchQuery = searchInput.value.trim().toLowerCase();
+    sharedStore.render();
+    privateStore.render();
+  });
+  searchInput.addEventListener("keydown", (e) => {
+    if (e.key !== "Escape") return;
+    searchInput.value = "";
+    searchQuery = "";
+    searchInput.style.display = "none";
+    sharedStore.render();
+    privateStore.render();
   });
 
   // ---------------------------------------------------------------------
@@ -954,7 +989,7 @@
   let currentTab = "shared";
   let lastWorkTab = "shared"; // remembers which work tab to return to
 
-  tabBar.querySelectorAll(".tab-btn").forEach((btn) => {
+  tabBar.querySelectorAll(".tab-btn[data-tab]").forEach((btn) => {
     btn.addEventListener("click", () => setTab(btn.dataset.tab));
   });
   // One button does both jobs: "プライベートへ" from work, "仕事に戻る" from
@@ -972,7 +1007,7 @@
   }
   document.addEventListener("keydown", (e) => {
     if (e.key !== "Escape" || currentTab !== "private") return;
-    if (modalOverlay.classList.contains("open") || shareOverlay.classList.contains("open") || nicknameOverlay.classList.contains("open")) return;
+    if (modalOverlay.classList.contains("open") || nicknameOverlay.classList.contains("open")) return;
     setTab(lastWorkTab);
   });
 
@@ -1000,6 +1035,73 @@
     if (tab === "completed") renderCompleted();
     if (tab === "private" && !privateUnlocked) setTimeout(() => privatePasswordInput.focus(), 30);
   }
+
+  // ---------------------------------------------------------------------
+  // Members (who's viewing) and Settings — both live in the sidebar now,
+  // opening a small modal rather than taking over the whole screen.
+  // ---------------------------------------------------------------------
+  const membersNavBtn = document.getElementById("membersNavBtn");
+  const membersOverlay = document.getElementById("membersOverlay");
+  const membersList = document.getElementById("membersList");
+  const membersCloseBtn = document.getElementById("membersCloseBtn");
+
+  membersNavBtn.addEventListener("click", () => {
+    const names = Array.from(presenceStack.querySelectorAll(".presence-avatar")).map((el) => el.dataset.name);
+    membersList.innerHTML = "";
+    if (!names.length) {
+      const empty = document.createElement("div");
+      empty.className = "column-empty";
+      empty.textContent = "今見ている人はいません。";
+      membersList.appendChild(empty);
+    } else {
+      names.forEach((name) => {
+        const row = document.createElement("div");
+        row.className = "member-row";
+        const av = document.createElement("span");
+        av.className = "presence-avatar";
+        av.style.background = colorForName(name);
+        av.style.marginLeft = "0";
+        av.textContent = initialFor(name);
+        row.appendChild(av);
+        const label = document.createElement("span");
+        label.textContent = name;
+        row.appendChild(label);
+        membersList.appendChild(row);
+      });
+    }
+    membersOverlay.classList.add("open");
+  });
+  membersCloseBtn.addEventListener("click", () => membersOverlay.classList.remove("open"));
+  membersOverlay.addEventListener("click", (e) => { if (e.target === membersOverlay) membersOverlay.classList.remove("open"); });
+
+  const settingsNavBtn = document.getElementById("settingsNavBtn");
+  const settingsOverlay = document.getElementById("settingsOverlay");
+  const settingsNicknameInput = document.getElementById("settingsNicknameInput");
+  const settingsNicknameSaveBtn = document.getElementById("settingsNicknameSaveBtn");
+  const settingsPrivateResetBtn = document.getElementById("settingsPrivateResetBtn");
+  const settingsCloseBtn = document.getElementById("settingsCloseBtn");
+
+  function openSettingsModal() {
+    settingsNicknameInput.value = currentNickname;
+    settingsOverlay.classList.add("open");
+  }
+  settingsNavBtn.addEventListener("click", openSettingsModal);
+  settingsCloseBtn.addEventListener("click", () => settingsOverlay.classList.remove("open"));
+  settingsOverlay.addEventListener("click", (e) => { if (e.target === settingsOverlay) settingsOverlay.classList.remove("open"); });
+  settingsNicknameSaveBtn.addEventListener("click", () => {
+    const name = settingsNicknameInput.value.trim();
+    if (!name) { settingsNicknameInput.focus(); return; }
+    nicknameInput.value = name;
+    confirmNickname();
+    settingsOverlay.classList.remove("open");
+  });
+  settingsPrivateResetBtn.addEventListener("click", () => {
+    if (!currentNickname) { showToast("先にニックネームを登録してください"); return; }
+    if (REMOTE_ENABLED) { showToast("この設定はローカルモード専用です"); return; }
+    localStorage.removeItem(localPassKey());
+    showToast("パスコードをリセットしました。次に入力した内容が新しいパスコードになります");
+    settingsOverlay.classList.remove("open");
+  });
 
   // ---------------------------------------------------------------------
   // Private login (real Supabase Auth when remote, hashed-password
@@ -1103,8 +1205,9 @@
       av.className = "presence-avatar" + (isSelf ? " is-self" : "");
       av.style.background = colorForName(name);
       av.textContent = initialFor(name);
-      av.title = isSelf ? `${name}(クリックしてニックネームを変更)` : name;
-      if (isSelf) av.addEventListener("click", () => openNicknameModal());
+      av.title = isSelf ? `${name}(クリックして設定を開く)` : name;
+      av.dataset.name = name;
+      if (isSelf) av.addEventListener("click", () => openSettingsModal());
       presenceStack.appendChild(av);
     });
   }

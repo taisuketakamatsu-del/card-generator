@@ -11,9 +11,9 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 </head>
 <body>
-<div class="app">
+<div class="app-shell">
 
-  <header class="topbar">
+  <aside class="sidebar">
     <div class="logo">
       <svg class="logo-mark" width="26" height="26" viewBox="0 0 32 32" fill="none">
         <defs>
@@ -28,24 +28,35 @@
       <span>t&thinsp;a&thinsp;i&thinsp;s&thinsp;k</span>
     </div>
 
-    <div class="topbar-right">
+    <nav class="tab-bar" id="tabBar">
+      <button type="button" class="tab-btn active" data-tab="shared">タスク</button>
+      <button type="button" class="tab-btn" data-tab="completed">完了済み</button>
+      <button type="button" class="tab-btn" id="membersNavBtn">メンバー</button>
+      <button type="button" class="tab-btn" id="settingsNavBtn">設定</button>
+    </nav>
+
+    <div class="sidebar-footer">
       <div class="presence-stack" id="presenceStack" title="今見ている人"></div>
+    </div>
+  </aside>
 
-      <nav class="tab-bar" id="tabBar">
-        <button type="button" class="tab-btn active" data-tab="shared">仕事</button>
-        <button type="button" class="tab-btn" data-tab="completed">完了済み</button>
-      </nav>
+  <div class="app">
 
+  <header class="topbar">
+    <div class="search-wrap">
+      <button type="button" class="icon-btn" id="searchToggleBtn" title="検索">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      </button>
+      <input type="text" class="search-input" id="searchInput" placeholder="タスクを検索" style="display:none;">
+    </div>
+
+    <div class="topbar-right">
       <button type="button" class="private-toggle-btn icon-only" id="privateToggleBtn" title="プライベート">
         <svg class="icon-lock" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="9" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
         <svg class="icon-back" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none;"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
         <span id="privateToggleLabel" class="sr-only">プライベート</span>
       </button>
 
-      <button class="btn-share" id="shareBtn" title="タスクを共有">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
-        <span>共有</span>
-      </button>
       <button class="btn-add" id="addBtn" title="タスクを追加">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
       </button>
@@ -139,18 +150,34 @@
   </div>
 </div>
 
-<!-- Share link -->
-<div class="modal-overlay" id="shareOverlay">
+<!-- Members -->
+<div class="modal-overlay" id="membersOverlay">
   <div class="modal">
-    <h3>このリンクを共有</h3>
-    <p class="modal-sub">同じリンクを開けば、同じタスクをみんなで見られます。</p>
-    <div class="share-link-row">
-      <input id="shareLinkInput" class="text-input" readonly />
-      <button class="btn-primary" id="shareCopyBtn">コピー</button>
-    </div>
+    <h3>メンバー</h3>
+    <p class="modal-sub">今このアプリを見ている人です。</p>
+    <div class="members-list" id="membersList"></div>
     <div class="modal-actions">
       <div class="spacer"></div>
-      <button class="btn-ghost" id="shareCloseBtn">閉じる</button>
+      <button class="btn-ghost" id="membersCloseBtn">閉じる</button>
+    </div>
+  </div>
+</div>
+
+<!-- Settings -->
+<div class="modal-overlay" id="settingsOverlay">
+  <div class="modal">
+    <h3>設定</h3>
+    <label class="field-label">ニックネーム</label>
+    <input id="settingsNicknameInput" class="text-input" maxlength="24" />
+    <div class="modal-actions">
+      <div class="spacer"></div>
+      <button class="btn-primary" id="settingsNicknameSaveBtn">保存</button>
+    </div>
+    <label class="field-label" style="margin-top:20px;">プライベートのパスコード</label>
+    <button type="button" class="btn-ghost" id="settingsPrivateResetBtn" style="width:100%;">パスコードをリセットする</button>
+    <div class="modal-actions">
+      <div class="spacer"></div>
+      <button class="btn-ghost" id="settingsCloseBtn">閉じる</button>
     </div>
   </div>
 </div>
