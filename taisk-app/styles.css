@@ -107,7 +107,31 @@ body.tab-private {
   padding: 0 8px;
 }
 @media (max-width: 900px) {
-  .sidebar { display: none; }
+  /* No room for a side rail on a phone — the nav becomes a fixed bottom
+     bar instead of just disappearing (which used to leave 完了済み/
+     メンバー/設定 completely unreachable on mobile). */
+  .app-shell.sidebar-collapsed .sidebar { display: flex; }
+  .sidebar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    top: auto;
+    width: 100%;
+    height: auto;
+    padding: 0;
+    gap: 0;
+    border-right: none;
+    border-top: 1px solid var(--panel-border);
+    background: rgba(10, 12, 22, 0.94);
+    z-index: 40;
+  }
+  .sidebar .logo,
+  .sidebar-footer {
+    display: none;
+  }
+  .sidebar-expand-btn { display: none !important; }
+  .app { padding-bottom: calc(58px + env(safe-area-inset-bottom)); }
 }
 
 .sidebar-collapse-btn {
@@ -310,6 +334,24 @@ body.tab-private {
 .tab-btn.active[data-tab="shared"] { background: rgba(124, 92, 252, 0.28); }
 .tab-btn.active[data-tab="completed"] { background: rgba(148, 163, 184, 0.28); }
 .tab-btn:not(.active):hover { color: var(--text-primary); }
+
+@media (max-width: 900px) {
+  /* Sidebar becomes a fixed bottom bar on mobile (see the .sidebar rules
+     above) — lay its nav out as a row of equal-width tabs instead of a
+     vertical list. */
+  .tab-bar {
+    flex-direction: row;
+    gap: 2px;
+    padding: 6px calc(6px + env(safe-area-inset-right)) calc(6px + env(safe-area-inset-bottom)) calc(6px + env(safe-area-inset-left));
+  }
+  .tab-btn {
+    flex: 1;
+    width: auto;
+    text-align: center;
+    font-size: 11.5px;
+    padding: 10px 2px;
+  }
+}
 
 /* 仕事/完了済み stay visible and reachable even while in プライベート —
    only the content area and background switch, never the navigation. */
@@ -705,7 +747,7 @@ body.tab-private .btn-add {
 @media (max-width: 620px) {
   /* Narrow screens trade vertical stacking for horizontal swipe, so the
      page still never needs to scroll vertically. */
-  .app { padding: 20px 16px 14px; }
+  .app { padding: 20px 16px calc(58px + env(safe-area-inset-bottom)); }
   .board {
     display: flex;
     overflow-x: auto;
@@ -713,6 +755,13 @@ body.tab-private .btn-add {
     padding-bottom: 4px;
   }
   .column { min-width: 82%; flex: none; }
+
+  /* Rank-based shrink (--rank-scale) was tuned for desktop's extra space;
+     on a phone it makes rank 2/3 いまやる rows too small to read/tap
+     comfortably, so keep size consistent regardless of rank there. */
+  .now-row { padding: 14px 20px; }
+  .now-row .task-title { font-size: 15px; }
+  .now-row.overflow .task-title { font-size: 13.5px; }
 }
 
 .column {
@@ -938,6 +987,12 @@ body.tab-private .btn-add {
 .more-btn.menu-open,
 .more-btn.always-visible { opacity: 1; }
 .more-btn:hover { background: rgba(255,255,255,0.08); }
+/* :hover never fires on a touchscreen, so the "..." button — the only way
+   to edit/pin/delete/change the date on mobile, since right-click has no
+   touch equivalent — would otherwise stay invisible forever. */
+@media (hover: none) {
+  .more-btn { opacity: 1; }
+}
 
 /* ---------- Completed tasks archive ---------- */
 .completed-list {
