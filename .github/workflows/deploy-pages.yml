@@ -32,6 +32,15 @@ jobs:
         with:
           enablement: true
 
+      # Browsers/CDNs cache styles.css and app.js aggressively, so a plain
+      # redeploy at the same URL can keep serving an old version. Tagging
+      # both with the commit SHA gives every deploy a distinct asset URL,
+      # forcing a fresh fetch without needing a manual hard refresh.
+      - name: Cache-bust local assets
+        run: |
+          sed -i "s/styles\.css\"/styles.css?v=${GITHUB_SHA}\"/" taisk-app/index.html
+          sed -i "s/app\.js\"/app.js?v=${GITHUB_SHA}\"/" taisk-app/index.html
+
       - name: Upload taisk-app as Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
