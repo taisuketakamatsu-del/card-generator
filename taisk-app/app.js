@@ -61,7 +61,8 @@
     if (diff === 1) return "明日";
     if (diff === -1) return "昨日";
     if (diff > 1 && diff <= 6) return `${WEEKDAY_JP[due.getDay()]}曜日`;
-    return `${due.getMonth() + 1}/${due.getDate()}(${WEEKDAY_JP[due.getDay()]})`;
+    const yearPrefix = due.getFullYear() !== startOfToday().getFullYear() ? `${due.getFullYear()}/` : "";
+    return `${yearPrefix}${due.getMonth() + 1}/${due.getDate()}(${WEEKDAY_JP[due.getDay()]})`;
   }
 
   function dueUrgencyClass(dateStr) {
@@ -77,8 +78,21 @@
 
   // Pulls a leading "9/22" or "9/22(火)" off a pasted line (used by bulk
   // add) and turns it into a real due_date, assuming the nearest such
-  // date that isn't more than ~2 months in the past.
+  // date that isn't more than ~2 months in the past. A leading full date
+  // ("2027-04-30" / "2027/4/30") is taken as-is instead — needed for
+  // multi-year-out goals, where the "nearest year" guess would be wrong.
   function extractLeadingDate(line) {
+    const full = line.match(/^\s*(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})[\s　:：、]*(.*)$/);
+    if (full) {
+      const year = parseInt(full[1], 10);
+      const month = parseInt(full[2], 10);
+      const day = parseInt(full[3], 10);
+      const rest = full[4].trim();
+      if (rest && month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+        const iso = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+        return { title: rest, due_date: iso };
+      }
+    }
     const m = line.match(/^\s*(\d{1,2})\/(\d{1,2})(?:\([月火水木金土日]\))?[\s　:：、]*(.*)$/);
     if (!m) return { title: line, due_date: null };
     const month = parseInt(m[1], 10);
@@ -477,11 +491,14 @@
     });
   }
 
+  // Icon-only — the full date/relative label ("今日", "9/29(火)", ...)
+  // lives in the title tooltip instead of taking up visible row space.
   function makeDueBadge(task) {
     if (!task.due_date) return null;
     const badge = document.createElement("span");
     badge.className = `due-badge ${dueUrgencyClass(task.due_date)}`;
-    badge.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="16" y1="2" x2="16" y2="6"/></svg><span>${formatDueBadge(task.due_date)}</span>`;
+    badge.title = formatDueBadge(task.due_date);
+    badge.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="16" y1="2" x2="16" y2="6"/></svg>`;
     return badge;
   }
 

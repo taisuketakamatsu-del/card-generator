@@ -890,15 +890,14 @@ body.tab-private .btn-add {
   flex: none;
   display: flex;
   align-items: center;
-  gap: 5px;
-  padding: 4px 10px;
-  border-radius: 999px;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
   background: rgba(255, 255, 255, 0.09);
   border: 1px solid rgba(255, 255, 255, 0.14);
   color: var(--text-primary);
-  font-size: 12px;
-  font-weight: 600;
-  white-space: nowrap;
+  cursor: default;
 }
 .due-badge.due-overdue { background: rgba(244, 63, 94, 0.2); border-color: rgba(244, 63, 94, 0.45); color: #fda4af; }
 .due-badge.due-today { background: rgba(251, 146, 60, 0.2); border-color: rgba(251, 146, 60, 0.45); color: #fdba74; }
