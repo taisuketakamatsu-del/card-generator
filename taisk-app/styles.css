@@ -959,9 +959,16 @@ body.tab-private .btn-add {
   padding: 6px;
   min-width: 160px;
   box-shadow: 0 12px 30px rgba(0,0,0,0.45);
-  z-index: 20;
+  z-index: 999;
   display: flex;
   flex-direction: column;
+  /* Forces its own compositing layer so the backdrop-filter blur on the
+     rows/columns underneath can't get sampled through this opaque menu —
+     without this, some browsers render the menu translucent over blurred
+     content instead of solid. */
+  isolation: isolate;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 .row-menu button {
   background: transparent;
