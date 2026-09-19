@@ -421,6 +421,23 @@
     return menu;
   }
 
+  // Both the "..." button and right-click open the same menu at a fixed
+  // viewport position, appended straight to <body> — never as a child of
+  // the row itself. A row-menu nested inside a task row (which has its own
+  // backdrop-filter blur) rendered translucent on some browsers/GPUs
+  // instead of solid; living outside that element entirely sidesteps it.
+  function openRowMenuAt(x, y, task, actions) {
+    closeMenus();
+    openMenuId = task.id;
+    const menu = buildMenu(task, actions);
+    menu.style.position = "fixed";
+    menu.style.left = `${Math.max(0, Math.min(x, window.innerWidth - 180))}px`;
+    menu.style.top = `${Math.max(0, Math.min(y, window.innerHeight - 210))}px`;
+    menu.style.right = "auto";
+    document.body.appendChild(menu);
+    return menu;
+  }
+
   function makeMoreBtn(task, actions) {
     const btn = document.createElement("button");
     btn.className = "more-btn";
@@ -433,9 +450,9 @@
       const isOpen = openMenuId === task.id;
       closeMenus();
       if (isOpen) return;
-      openMenuId = task.id;
       btn.classList.add("menu-open");
-      btn.parentElement.appendChild(buildMenu(task, actions));
+      const rect = btn.getBoundingClientRect();
+      openRowMenuAt(rect.right - 180, rect.bottom + 6, task, actions);
     });
     return btn;
   }
@@ -446,14 +463,7 @@
     row.addEventListener("contextmenu", (e) => {
       e.preventDefault();
       e.stopPropagation();
-      closeMenus();
-      openMenuId = task.id;
-      const menu = buildMenu(task, actions);
-      menu.style.position = "fixed";
-      menu.style.left = `${Math.min(e.clientX, window.innerWidth - 180)}px`;
-      menu.style.top = `${Math.min(e.clientY, window.innerHeight - 210)}px`;
-      menu.style.right = "auto";
-      document.body.appendChild(menu);
+      openRowMenuAt(e.clientX, e.clientY, task, actions);
     });
   }
 
