@@ -471,12 +471,7 @@
       attachContextMenu(row, task, actions);
 
       row.appendChild(makeCheckIcon());
-      const title = document.createElement("div");
-      title.className = "task-title";
-      title.textContent = task.title;
-      row.appendChild(title);
-      const dueBadge = makeDueBadge(task);
-      if (dueBadge) row.appendChild(dueBadge);
+      row.appendChild(makeRowBody(task));
       row.appendChild(makeMoreBtn(task, actions));
       store.els.nowList.appendChild(row);
     });
@@ -488,6 +483,22 @@
     badge.className = `due-badge ${dueUrgencyClass(task.due_date)}`;
     badge.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="16" y1="2" x2="16" y2="6"/></svg><span>${formatDueBadge(task.due_date)}</span>`;
     return badge;
+  }
+
+  // Title and due-badge stack vertically instead of sharing one row, so a
+  // long title gets the row's full width to wrap in rather than fighting
+  // the badge for space (which used to force ugly 1-2 character lines in
+  // narrow board columns).
+  function makeRowBody(task) {
+    const body = document.createElement("div");
+    body.className = "row-body";
+    const title = document.createElement("div");
+    title.className = "task-title";
+    title.textContent = task.title;
+    body.appendChild(title);
+    const dueBadge = makeDueBadge(task);
+    if (dueBadge) body.appendChild(dueBadge);
+    return body;
   }
 
   function renderBoard(store) {
@@ -549,12 +560,7 @@
         attachContextMenu(row, task, actions);
 
         row.appendChild(makeCheckIcon());
-        const title = document.createElement("div");
-        title.className = "task-title";
-        title.textContent = task.title;
-        row.appendChild(title);
-        const dueBadge = makeDueBadge(task);
-        if (dueBadge) row.appendChild(dueBadge);
+        row.appendChild(makeRowBody(task));
         row.appendChild(makeMoreBtn(task, actions));
         list.appendChild(row);
       });

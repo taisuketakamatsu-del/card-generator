@@ -868,6 +868,24 @@ body.tab-private .btn-add {
   color: var(--text-muted);
 }
 
+/* Title + due-badge stack vertically so a long title gets the row's full
+   width to wrap in, instead of squeezing against the badge on one line
+   (which used to force ugly 1-2 character lines in narrow board columns). */
+.row-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.row-body .task-title {
+  flex: none;
+  min-width: auto;
+}
+.row-body .due-badge {
+  align-self: flex-start;
+}
+
 .due-badge {
   flex: none;
   display: flex;
