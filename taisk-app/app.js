@@ -749,6 +749,21 @@
       }
     };
 
+    // Older tasks (added before due-date parsing existed, or typed straight
+    // into the single-line title box) can still have a leading "9/19(土)"
+    // baked into the title text itself, with no real due_date — so they
+    // never get the calendar icon. Self-heals once per load: re-parse any
+    // such title, strip the date back out, and turn it into a real due_date.
+    async function migrateLeadingDates() {
+      const toFix = store.tasks.filter((t) => !t.due_date && !t.done && extractLeadingDate(t.title).due_date);
+      if (!toFix.length) return;
+      for (const t of toFix) {
+        const { title, due_date } = extractLeadingDate(t.title);
+        await store.updateTask(t.id, { title, due_date });
+      }
+      showToast(`${toFix.length}件のタスクの日付をアイコン化しました`);
+    }
+
     store.init = async function (client) {
       if (client) {
         store.authClient = client;
@@ -763,6 +778,7 @@
       } else {
         store.tasks = loadLocal(localKey, seedFn);
       }
+      await migrateLeadingDates();
       await store.purgeOldCompleted();
       store.render();
     };
