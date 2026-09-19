@@ -74,14 +74,12 @@
     return Math.round((due - startOfToday()) / 86400000);
   }
 
+  // Always the actual date (M/D(weekday)) — which column it's in already
+  // says "today"/"this week", so a relative label ("今日"/"明日") on top
+  // of that was redundant and hid the specific date.
   function formatDueBadge(dateStr) {
     const due = parseDueDate(dateStr);
     if (!due) return "";
-    const diff = dueDiffDays(dateStr);
-    if (diff === 0) return "今日";
-    if (diff === 1) return "明日";
-    if (diff === -1) return "昨日";
-    if (diff > 1 && diff <= 6) return `${WEEKDAY_JP[due.getDay()]}曜日`;
     const yearPrefix = due.getFullYear() !== startOfToday().getFullYear() ? `${due.getFullYear()}/` : "";
     return `${yearPrefix}${due.getMonth() + 1}/${due.getDate()}(${WEEKDAY_JP[due.getDay()]})`;
   }
