@@ -43,6 +43,27 @@
     return "later";
   }
 
+  // Dragging a task to a different column needs to pick a due_date that
+  // actually lands in that bucket (bucket is always derived from due_date
+  // at render time) — otherwise the manual move either gets undone on the
+  // next render, or the date/icon has to be wiped to stick, which is what
+  // used to happen and made the icon disappear on every manual move.
+  function representativeDateForBucket(key) {
+    const today = startOfToday();
+    const weekEnd = new Date(today); weekEnd.setDate(weekEnd.getDate() + 6);
+    const monthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+    let due;
+    if (key === "today") due = today;
+    else if (key === "week") due = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 3);
+    else if (key === "month") {
+      const afterWeek = new Date(weekEnd); afterWeek.setDate(afterWeek.getDate() + 1);
+      due = afterWeek > monthEnd ? monthEnd : afterWeek;
+    } else {
+      due = new Date(monthEnd); due.setDate(due.getDate() + 1);
+    }
+    return `${due.getFullYear()}-${String(due.getMonth() + 1).padStart(2, "0")}-${String(due.getDate()).padStart(2, "0")}`;
+  }
+
   function effectiveBucket(task) {
     return (task.due_date && computeBucketFromDate(task.due_date)) || task.bucket || "week";
   }
@@ -229,6 +250,20 @@
       if (Array.isArray(parsed)) return parsed;
     } catch (err) { /* plain single id, not JSON */ }
     return [raw];
+  }
+
+  // A full re-render swaps in brand-new row elements with no transition of
+  // their own, so a manual move can look like the task just vanished from
+  // one column and popped into another with no visible connection between
+  // the two. Give the row(s) that just landed a brief glow so the eye can
+  // follow where they went.
+  function highlightAfterMove(ids) {
+    requestAnimationFrame(() => {
+      ids.forEach((id) => {
+        const el = document.querySelector(`.task-row[data-id="${id}"], .now-row[data-id="${id}"]`);
+        if (el) el.classList.add("just-moved");
+      });
+    });
   }
 
   document.addEventListener("click", (e) => {
@@ -491,14 +526,15 @@
     });
   }
 
-  // Icon-only — the full date/relative label ("今日", "9/29(火)", ...)
-  // lives in the title tooltip instead of taking up visible row space.
+  // Calendar icon + the actual date label together — icon alone isn't
+  // useful if you can't tell which date it means at a glance. Sits on its
+  // own line below the title (see .row-body), so showing the text back
+  // doesn't reintroduce the old wrapping problem.
   function makeDueBadge(task) {
     if (!task.due_date) return null;
     const badge = document.createElement("span");
     badge.className = `due-badge ${dueUrgencyClass(task.due_date)}`;
-    badge.title = formatDueBadge(task.due_date);
-    badge.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="16" y1="2" x2="16" y2="6"/></svg>`;
+    badge.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="16" y1="2" x2="16" y2="6"/></svg><span>${formatDueBadge(task.due_date)}</span>`;
     return badge;
   }
 
@@ -591,16 +627,18 @@
         col.classList.remove("drag-over");
         const ids = getDragIds(e);
         // A manual drag always wins: dropping it here fixes the bucket
-        // explicitly, clears the date-driven auto-sort, and — if it came
-        // from いまやる — unpins it so it actually shows up here instead
-        // of staying in the spotlight only.
+        // explicitly (moving the due_date to land in that bucket instead of
+        // clearing it, so the date/icon doesn't just disappear), and — if
+        // it came from いまやる — unpins it so it actually shows up here
+        // instead of staying in the spotlight only.
         ids.forEach((id) => {
           const task = store.tasks.find((t) => t.id === id);
           if (task && (effectiveBucket(task) !== bucketDef.key || task.pinned)) {
-            store.updateTask(id, { bucket: bucketDef.key, due_date: null, pinned: false });
+            store.updateTask(id, { bucket: bucketDef.key, due_date: representativeDateForBucket(bucketDef.key), pinned: false });
           }
         });
         if (ids.length > 1) clearSelection();
+        highlightAfterMove(ids);
       });
 
       store.els.board.appendChild(col);
@@ -656,6 +694,7 @@
           if (task && !task.pinned) { store.updateTask(id, { pinned: true, priority: maxPriority + offset }); offset++; }
         });
         clearSelection();
+        highlightAfterMove(ids);
         return;
       }
       const id = ids[0];
@@ -664,6 +703,7 @@
       if (!task.pinned) {
         const maxPriority = Math.max(0, ...store.tasks.filter((t) => t.pinned).map((t) => t.priority || 0));
         store.updateTask(id, { pinned: true, priority: maxPriority + 1 });
+        highlightAfterMove(ids);
         return;
       }
       const orderedIds = Array.from(listEl.querySelectorAll(".now-row[data-id]")).map((r) => r.dataset.id);

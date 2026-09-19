@@ -830,6 +830,19 @@ body.tab-private .btn-add {
   box-shadow: 0 0 0 1px rgba(124, 92, 252, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.18);
 }
 
+/* A brief glow on whichever row just landed after a manual drag, since a
+   full re-render swaps in a new element with no transition of its own —
+   without this the task just disappears from one spot and appears in
+   another with nothing visibly connecting the two. */
+@keyframes justMovedPulse {
+  0% { box-shadow: 0 0 0 2px rgba(124, 92, 252, 0.9), 0 0 26px rgba(124, 92, 252, 0.55); }
+  100% { box-shadow: 0 0 0 0 rgba(124, 92, 252, 0); }
+}
+.task-row.just-moved,
+.now-row.just-moved {
+  animation: justMovedPulse 900ms ease-out;
+}
+
 .task-row.done .task-title { text-decoration: line-through; color: var(--text-muted); }
 
 /* ---------- shared row bits ---------- */
@@ -890,13 +903,15 @@ body.tab-private .btn-add {
   flex: none;
   display: flex;
   align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: 999px;
   background: rgba(255, 255, 255, 0.09);
   border: 1px solid rgba(255, 255, 255, 0.14);
   color: var(--text-primary);
+  font-size: 11.5px;
+  font-weight: 600;
+  white-space: nowrap;
   cursor: default;
 }
 .due-badge.due-overdue { background: rgba(244, 63, 94, 0.2); border-color: rgba(244, 63, 94, 0.45); color: #fda4af; }
