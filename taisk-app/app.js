@@ -220,6 +220,10 @@
   // Ctrl/Cmd+click multi-select, used to drag a batch of tasks between
   // columns or into いまやる at once (see the dragstart/drop handlers below).
   const selectedIds = new Set();
+  // The anchor for shift-click range selection — the last row touched via
+  // Ctrl/Cmd+click or Shift+click (Finder-style: plain clicks that complete
+  // a task don't move the anchor).
+  let lastClickedId = null;
   function toggleSelect(id, row) {
     if (selectedIds.has(id)) { selectedIds.delete(id); row.classList.remove("selected"); }
     else { selectedIds.add(id); row.classList.add("selected"); }
@@ -228,6 +232,27 @@
     if (!selectedIds.size) return;
     selectedIds.clear();
     document.querySelectorAll(".task-row.selected, .now-row.selected").forEach((el) => el.classList.remove("selected"));
+  }
+  // Shift+click: select every row between the last-touched row (anchor)
+  // and the one just clicked, within the same column/list — same
+  // convention as Finder/Explorer. Falls back to a plain toggle if there's
+  // no anchor in this container yet.
+  function rangeSelectTo(container, task, row) {
+    const rows = Array.from(container.querySelectorAll(".task-row[data-id], .now-row[data-id]"));
+    const ids = rows.map((r) => r.dataset.id);
+    const anchorIdx = lastClickedId ? ids.indexOf(lastClickedId) : -1;
+    const targetIdx = ids.indexOf(task.id);
+    if (anchorIdx === -1 || targetIdx === -1) {
+      toggleSelect(task.id, row);
+      lastClickedId = task.id;
+      return;
+    }
+    clearSelection();
+    const [start, end] = anchorIdx < targetIdx ? [anchorIdx, targetIdx] : [targetIdx, anchorIdx];
+    for (let i = start; i <= end; i++) {
+      selectedIds.add(ids[i]);
+      rows[i].classList.add("selected");
+    }
   }
   function selectSameDueDate(store, task) {
     if (!task.due_date) return;
@@ -331,9 +356,16 @@
     let pendingTimer = null;
     row.addEventListener("click", (e) => {
       if (e.target.closest(".more-btn") || e.target.closest(".row-menu")) return;
+      if (e.shiftKey) {
+        e.preventDefault();
+        const container = row.closest(".column-list") || row.closest(".now-list");
+        if (container) rangeSelectTo(container, task, row);
+        return;
+      }
       if (e.metaKey || e.ctrlKey) {
         e.preventDefault();
         toggleSelect(task.id, row);
+        lastClickedId = task.id;
         return;
       }
       if (pendingTimer) {
@@ -438,7 +470,7 @@
     return menu;
   }
 
-  function makeMoreBtn(task, actions) {
+  function makeMoreBtn(task, actions, store) {
     const btn = document.createElement("button");
     btn.className = "more-btn";
     btn.textContent = "⋯";
@@ -450,21 +482,93 @@
       const isOpen = openMenuId === task.id;
       closeMenus();
       if (isOpen) return;
-      btn.classList.add("menu-open");
       const rect = btn.getBoundingClientRect();
+      if (selectedIds.size > 1 && selectedIds.has(task.id)) {
+        openBulkMenuAt(rect.right - 180, rect.bottom + 6, Array.from(selectedIds), store);
+        return;
+      }
+      btn.classList.add("menu-open");
       openRowMenuAt(rect.right - 180, rect.bottom + 6, task, actions);
     });
     return btn;
   }
 
   // Right-click anywhere on a task row opens the same edit/pin/delete menu,
-  // positioned at the cursor instead of anchored under the "..." button.
-  function attachContextMenu(row, task, actions) {
+  // positioned at the cursor instead of anchored under the "..." button —
+  // or, if the row is part of an active multi-selection, a bulk menu that
+  // acts on every selected task at once (Finder-style).
+  function attachContextMenu(row, task, actions, store) {
     row.addEventListener("contextmenu", (e) => {
       e.preventDefault();
       e.stopPropagation();
+      if (selectedIds.size > 1 && selectedIds.has(task.id)) {
+        openBulkMenuAt(e.clientX, e.clientY, Array.from(selectedIds), store);
+        return;
+      }
       openRowMenuAt(e.clientX, e.clientY, task, actions);
     });
+  }
+
+  function buildBulkMenu(ids, store) {
+    const menu = document.createElement("div");
+    menu.className = "row-menu";
+
+    const label = document.createElement("div");
+    label.className = "row-menu-label";
+    label.textContent = `${ids.length}件を選択中`;
+    menu.appendChild(label);
+
+    const dateBtn = document.createElement("button");
+    dateBtn.textContent = "期限をまとめて変更";
+    dateBtn.addEventListener("click", (e2) => {
+      e2.stopPropagation();
+      const rect = dateBtn.getBoundingClientRect();
+      closeMenus();
+      openInlineDatePicker(rect.left, rect.bottom, null, (newDate) => {
+        ids.forEach((id) => store.updateTask(id, { due_date: newDate }));
+        showToast(`${ids.length}件の期限を変更しました`);
+        clearSelection();
+      });
+    });
+    menu.appendChild(dateBtn);
+
+    const pinBtn = document.createElement("button");
+    pinBtn.textContent = "いまやるにまとめて追加";
+    pinBtn.addEventListener("click", (e2) => {
+      e2.stopPropagation();
+      closeMenus();
+      const maxPriority = Math.max(0, ...store.tasks.filter((t) => t.pinned).map((t) => t.priority || 0));
+      let offset = 1;
+      ids.forEach((id) => {
+        const t = store.tasks.find((x) => x.id === id);
+        if (t && !t.pinned) { store.updateTask(id, { pinned: true, priority: maxPriority + offset }); offset++; }
+      });
+      clearSelection();
+    });
+    menu.appendChild(pinBtn);
+
+    const delBtn = document.createElement("button");
+    delBtn.textContent = `選択した${ids.length}件を削除`;
+    delBtn.className = "danger";
+    delBtn.addEventListener("click", (e2) => {
+      e2.stopPropagation();
+      closeMenus();
+      ids.forEach((id) => store.deleteTask(id));
+      clearSelection();
+    });
+    menu.appendChild(delBtn);
+
+    return menu;
+  }
+
+  function openBulkMenuAt(x, y, ids, store) {
+    closeMenus();
+    const menu = buildBulkMenu(ids, store);
+    menu.style.position = "fixed";
+    menu.style.left = `${Math.max(0, Math.min(x, window.innerWidth - 180))}px`;
+    menu.style.top = `${Math.max(0, Math.min(y, window.innerHeight - 230))}px`;
+    menu.style.right = "auto";
+    document.body.appendChild(menu);
   }
 
   function renderNowList(store) {
@@ -525,11 +629,11 @@
         onChangeDate: (newDate) => { store.updateTask(task.id, { due_date: newDate }); showToast(newDate ? "期限を変更しました" : "期限を削除しました"); },
         onSelectSameDate: () => selectSameDueDate(store, task),
       };
-      attachContextMenu(row, task, actions);
+      attachContextMenu(row, task, actions, store);
 
       row.appendChild(makeCheckIcon());
       row.appendChild(makeRowBody(task));
-      row.appendChild(makeMoreBtn(task, actions));
+      row.appendChild(makeMoreBtn(task, actions, store));
       store.els.nowList.appendChild(row);
     });
   }
@@ -618,11 +722,11 @@
           onChangeDate: (newDate) => { store.updateTask(task.id, { due_date: newDate }); showToast(newDate ? "期限を変更しました" : "期限を削除しました"); },
           onSelectSameDate: () => selectSameDueDate(store, task),
         };
-        attachContextMenu(row, task, actions);
+        attachContextMenu(row, task, actions, store);
 
         row.appendChild(makeCheckIcon());
         row.appendChild(makeRowBody(task));
-        row.appendChild(makeMoreBtn(task, actions));
+        row.appendChild(makeMoreBtn(task, actions, store));
         list.appendChild(row);
       });
 
